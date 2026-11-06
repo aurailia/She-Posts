@@ -167,6 +167,10 @@
   .dchip { font: inherit; font-size: 15px; font-weight: 600; min-width: 52px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line-strong); background: transparent; color: var(--faint); cursor: pointer; }
   .dchip.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
   .glim { display: block; font-size: 13.5px; font-weight: 500; color: var(--faint); margin-top: 2px; }
+  .gvers { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+  .vtag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line-strong); }
+  .vtag.me { background: var(--teal); color: #0d2a26; border-color: var(--teal); }
+  .ptab .pn { font-size: 12px; font-weight: 700; opacity: .85; margin-left: 4px; }
   .tick.full { opacity: .5; cursor: not-allowed; }
   .day .gcount { font-size: 14px; color: var(--faint); }
   .grow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; align-items: center; }
@@ -656,7 +660,7 @@
     var today = groupsFor(d), off = S.groups.length - today.length;
     var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
     $("dayBody").innerHTML =
-      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + "</button>"; }).join("") +
+      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + "</button>"; }).join("") +
       '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
@@ -681,8 +685,10 @@
           (today.length ? '<div class="glist">' + today.map(function (g) {
             var lim = gLimit(g), used = usedOn(g, d), mine = !!cur.posted[g.id], full = lim && used >= lim && !mine;
             return '<div class="gitem"><span class="gname">' + (g.link ? '<a href="' + esc(g.link) + '" target="_blank" rel="noopener">' + esc(g.name) + " &#8599;</a>" : esc(g.name)) +
-              '<span class="glim">' + (lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span></span>" +
-              '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Posted" : full ? "Full today" : "Mark posted") + "</button></div>";
+              '<span class="glim">' + (lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span>" +
+              (function () { var vs = []; ps.forEach(function (pp, ii) { if (pp.posted && pp.posted[g.id]) vs.push(ii + 1); }); return vs.length ? '<span class="gvers">' + vs.map(function (n) { return '<span class="vtag' + (ps[n - 1].id === cur.id ? " me" : "") + '">Post ' + n + "</span>"; }).join("") + "</span>" : ""; })() +
+              "</span>" +
+              '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Post " + (ps.indexOf(cur) + 1) + " posted" : full ? "Full today" : "Mark Post " + (ps.indexOf(cur) + 1) + " posted") + "</button></div>";
           }).join("") + "</div>" : '<p class="hint">' + (S.groups.length ? "None of your groups take promos on " + DAYS[d] + "." : "Add your groups in") + ' <a href="#groups" style="color:var(--gold)">My groups</a>' + (S.groups.length ? " to change their days." : ".") + "</p>") +
           (today.length && off ? '<p class="hint">' + off + (off === 1 ? " group doesn\u2019t" : " groups don\u2019t") + " take promos on " + DAYS[d] + '. <a href="#groups" style="color:var(--gold)">Change days</a></p>' : "") +
         "</div>" +
