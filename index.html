@@ -170,6 +170,9 @@
   .gvers { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
   .vtag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line-strong); }
   .vtag.me { background: var(--teal); color: #0d2a26; border-color: var(--teal); }
+  .ptab .pf { display: block; font-size: 12px; font-weight: 600; opacity: .8; margin-top: 1px; }
+  .fors { display: block; font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .mine-note { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
   .ptab .pn { font-size: 12px; font-weight: 700; opacity: .85; margin-left: 4px; }
   .tick.full { opacity: .5; cursor: not-allowed; }
   .day .gcount { font-size: 14px; color: var(--faint); }
@@ -227,6 +230,7 @@
       </div>
       <div class="row">
         <select id="addDay" aria-label="Which day"></select>
+        <select id="addFor" aria-label="Who it's for"></select>
         <button class="btn primary" type="button" id="addGo">Add to the day</button>
         <button class="btn" type="button" id="addCancel">Cancel</button>
       </div>
@@ -276,6 +280,11 @@
             <button class="chip" type="button" data-where="community">My community</button>
             <button class="chip" type="button" data-where="social">Social media</button>
           </div>
+          <div id="bForWrap" hidden style="margin-top:10px">
+            <label for="bFor">Which community?</label>
+            <select id="bFor"></select>
+            <p class="hint" id="bForHint" hidden>Mark your own communities in <a href="#groups" style="color:var(--gold)">My groups</a> and they'll show up here.</p>
+          </div>
         </div>
         <div class="field">
           <span class="label">How many versions?</span>
@@ -304,6 +313,7 @@
         </div>
         <div class="row">
           <select id="bDay" aria-label="Which day"></select>
+          <select id="bAddFor" aria-label="Who it's for"></select>
           <button class="btn primary" type="button" id="bAdd">Add to the day</button>
         </div>
       </div>
@@ -313,7 +323,7 @@
   <!-- GROUPS -->
   <section id="vGroups" hidden>
     <h1>My groups</h1>
-    <p class="lede">The communities you post in. Set the days each group lets you promote and how many posts a day it allows. Each day only shows the groups you can post in, and keeps count for you.</p>
+    <p class="lede">The communities you post in. Mark the ones you own as My community. For promo groups, set the days you can promote and how many posts a day they allow. Each day only shows the groups you can post in, and keeps count for you.</p>
     <div class="panel">
       <div class="glist" id="gList"></div>
       <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a group</button></div>
@@ -407,7 +417,7 @@
   function unb64u(str) { str = str.replace(/-/g, "+").replace(/_/g, "/"); while (str.length % 4) str += "="; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
   function streamBytes(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
   function packWeek() {
-    var data = { posts: S.posts.map(function (p) { return { id: p.id, day: p.day, title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", posted: p.posted || {} }; }), groups: S.groups, build: S.build, updatedAt: S.updatedAt || Date.now() };
+    var data = { posts: S.posts.map(function (p) { return { id: p.id, day: p.day, for: p.for || "promo", title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", posted: p.posted || {} }; }), groups: S.groups, build: S.build, updatedAt: S.updatedAt || Date.now() };
     var bytes = new TextEncoder().encode(JSON.stringify(data));
     if (typeof CompressionStream === "function") return streamBytes(bytes, new CompressionStream("deflate-raw")).then(function (z) { return "import-z" + b64u(z); });
     return Promise.resolve("import-p" + b64u(bytes));
@@ -485,7 +495,17 @@
   function gDays(g) { return Array.isArray(g.days) ? g.days : [0, 1, 2, 3, 4, 5, 6]; }
   function gLimit(g) { return g.limit === 0 ? 0 : (g.limit || 1); }
   function usedOn(g, d) { return postsFor(d).filter(function (p) { return p.posted && p.posted[g.id]; }).length; }
-  function groupsFor(d) { return S.groups.filter(function (g) { return gDays(g).indexOf(d) !== -1; }); }
+  function groupsFor(d) { return S.groups.filter(function (g) { return !g.mine && gDays(g).indexOf(d) !== -1; }); }
+  function mineGroups() { return S.groups.filter(function (g) { return g.mine; }); }
+  function promoGroups() { return S.groups.filter(function (g) { return !g.mine; }); }
+  function pFor(p) { var f = p.for || "promo"; if (f === "promo" || f === "social") return f; return S.groups.some(function (g) { return g.id === f && g.mine; }) ? f : "promo"; }
+  function forLabel(f) { if (f === "promo") return "Promo post"; if (f === "social") return "Social media"; var g = S.groups.find(function (x) { return x.id === f; }); return g ? (g.name || "My community") : "Promo post"; }
+  function forOptions(sel) {
+    var m = mineGroups();
+    return (m.length ? '<optgroup label="My communities">' + m.map(function (g) { return '<option value="' + g.id + '"' + (sel === g.id ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("") + "</optgroup>" : "") +
+      '<optgroup label="Other communities"><option value="promo"' + (sel === "promo" ? " selected" : "") + '>Promo posts</option><option value="social"' + (sel === "social" ? " selected" : "") + ">Social media</option></optgroup>";
+  }
+  function targetsFor(p, d) { var f = pFor(p); if (f === "social") return []; if (f === "promo") return groupsFor(d); return S.groups.filter(function (g) { return g.id === f; }); }
   function postsFor(d) { return S.posts.filter(function (p) { return p.day === d; }); }
   function todayIdx() { var d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
 
@@ -518,10 +538,10 @@
     if (parts.length > 1 && parts[0].trim() && out.length > 1 && !/^\s*TITLE:/im.test(parts[0]) && parts[0].trim().split("\n").length < 4) out.shift();
     return out;
   }
-  function addPosts(text, day) {
+  function addPosts(text, day, f) {
     var list = parsePaste(text);
     if (!list.length) { toast("Paste a post first"); return 0; }
-    list.forEach(function (p) { p.day = day; S.posts.push(p); });
+    list.forEach(function (p) { p.day = day; p.for = f || "promo"; S.posts.push(p); });
     save();
     return list.length;
   }
@@ -608,9 +628,11 @@
         '<span class="dname">' + d + '<span class="count' + (ps.length ? " has" : "") + '">' + (ps.length ? ps.length + (ps.length === 1 ? " post" : " posts") : "Nothing yet") + '</span></span>' +
         (withImg ? '<img class="thumb" alt="" src="' + esc(imgSrc(withImg)) + '">' : '<span class="thumb empty">' + (ps.length ? "No image yet" : "Tap to add") + '</span>') +
         '<span class="ttl">' + (first ? esc(first.title || "Untitled post") : "&nbsp;") + '</span>' +
+        (ps.length ? '<span class="fors">' + (function () { var c = {}, order = []; ps.forEach(function (p) { var l = forLabel(pFor(p)); if (!c[l]) { c[l] = 0; order.push(l); } c[l]++; }); return order.map(function (l) { return esc(l) + (c[l] > 1 ? " \u00d7" + c[l] : ""); }).join(" \u00b7 "); })() + "</span>" : "") +
         '<span class="gcount">' + groupsFor(i).length + (groupsFor(i).length === 1 ? " group" : " groups") + " to post in</span></button>";
     }).join("");
     $("addDay").innerHTML = dayOptions(t);
+    $("addFor").innerHTML = forOptions("promo");
   }
   $("weekGrid").addEventListener("click", function (e) {
     var b = e.target.closest("[data-day]"); if (b) go(slug(+b.getAttribute("data-day")));
@@ -618,7 +640,7 @@
   $("openAdd").addEventListener("click", function () { $("addPanel").hidden = false; $("addText").focus(); });
   $("addCancel").addEventListener("click", function () { $("addPanel").hidden = true; });
   $("addGo").addEventListener("click", function () {
-    var d = +$("addDay").value, n = addPosts($("addText").value, d);
+    var d = +$("addDay").value, n = addPosts($("addText").value, d, $("addFor").value);
     if (n) { $("addText").value = ""; $("addPanel").hidden = true; toast("Added " + n + (n === 1 ? " post" : " posts") + " to " + DAYS[d]); renderWeek(); }
   });
   $("moveOpen").addEventListener("click", function () {
@@ -657,10 +679,10 @@
       return;
     }
     var cur = ps.find(function (p) { return p.id === curPost[d]; }) || ps[0]; curPost[d] = cur.id;
-    var today = groupsFor(d), off = S.groups.length - today.length;
+    var cf = pFor(cur), today = targetsFor(cur, d), off = cf === "promo" ? promoGroups().length - today.length : 0;
     var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
     $("dayBody").innerHTML =
-      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + "</button>"; }).join("") +
+      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + '<span class="pf">' + esc(forLabel(pFor(p))) + "</span></button>"; }).join("") +
       '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
@@ -673,23 +695,25 @@
         '<div class="foot"><span>&#128077; Like</span><span>&#128172; Comment</span></div></div>' +
         '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type. Links show as [words](link) here and become real links when you copy the post.</p>' +
       '</div><div class="side">' +
+        '<div class="panel"><label for="pFor" class="label">This post is for</label><select id="pFor">' + forOptions(cf) + "</select>" +
+          (mineGroups().length ? "" : '<p class="hint" style="margin:8px 0 0">Own a community? Mark it in <a href="#groups" style="color:var(--gold)">My groups</a> and it shows up here.</p>') + "</div>" +
         '<div class="panel"><span class="label">Copy</span><div class="row">' +
           '<button class="btn primary small" type="button" data-act="copy-title">Copy title</button>' +
           '<button class="btn primary small" type="button" data-act="copy-body">Copy post</button>' +
           (cur.imgPrompt ? '<button class="btn small" type="button" data-act="copy-img">Copy image prompt</button>' : "") +
         '</div><div class="row">' +
           '<button class="btn small" type="button" data-act="img">' + (imgSrc(cur) ? "Change image" : "Add image") + "</button>" +
-          (imgSrc(cur) ? '<button class="btn small" type="button" data-act="img-remove">Remove image</button>' : "") +
+          (imgSrc(cur) ? '<button class="btn primary small" type="button" data-act="img-save">&#11015; Download image</button><button class="btn small" type="button" data-act="img-copy">Copy image</button><button class="btn small" type="button" data-act="img-remove">Remove image</button>' : "") +
         "</div></div>" +
         '<div class="panel"><div class="row" style="justify-content:space-between"><span class="label" style="margin:0">Where I’m posting</span><span class="progress">' + done + " of " + today.length + " done</span></div>" +
           (today.length ? '<div class="glist">' + today.map(function (g) {
-            var lim = gLimit(g), used = usedOn(g, d), mine = !!cur.posted[g.id], full = lim && used >= lim && !mine;
+            var lim = g.mine ? 0 : gLimit(g), used = usedOn(g, d), mine = !!cur.posted[g.id], full = lim && used >= lim && !mine;
             return '<div class="gitem"><span class="gname">' + (g.link ? '<a href="' + esc(g.link) + '" target="_blank" rel="noopener">' + esc(g.name) + " &#8599;</a>" : esc(g.name)) +
-              '<span class="glim">' + (lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span>" +
+              '<span class="glim">' + (g.mine ? "My community" : lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span>" +
               (function () { var vs = []; ps.forEach(function (pp, ii) { if (pp.posted && pp.posted[g.id]) vs.push(ii + 1); }); return vs.length ? '<span class="gvers">' + vs.map(function (n) { return '<span class="vtag' + (ps[n - 1].id === cur.id ? " me" : "") + '">Post ' + n + "</span>"; }).join("") + "</span>" : ""; })() +
               "</span>" +
               '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Post " + (ps.indexOf(cur) + 1) + " posted" : full ? "Full today" : "Mark Post " + (ps.indexOf(cur) + 1) + " posted") + "</button></div>";
-          }).join("") + "</div>" : '<p class="hint">' + (S.groups.length ? "None of your groups take promos on " + DAYS[d] + "." : "Add your groups in") + ' <a href="#groups" style="color:var(--gold)">My groups</a>' + (S.groups.length ? " to change their days." : ".") + "</p>") +
+          }).join("") + "</div>" : cf === "social" ? '<p class="hint">A social media post. Copy it and share it wherever you like.</p>' : '<p class="hint">' + (promoGroups().length ? "None of your promo groups take promos on " + DAYS[d] + "." : "Add your promo groups in") + ' <a href="#groups" style="color:var(--gold)">My groups</a>' + (promoGroups().length ? " to change their days." : ".") + "</p>") +
           (today.length && off ? '<p class="hint">' + off + (off === 1 ? " group doesn\u2019t" : " groups don\u2019t") + " take promos on " + DAYS[d] + '. <a href="#groups" style="color:var(--gold)">Change days</a></p>' : "") +
         "</div>" +
         '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
@@ -760,6 +784,36 @@
     } catch (e) {}
     copy(plain, "Post copied", $("sBody"));
   }
+  /* ---------- get the image out, to upload in Skool ---------- */
+  function imgName(p) { var t = toPlain(p.title || "she-posts").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); return (t || "she-posts") + ".jpg"; }
+  function imgBlob(p) { return fetch(imgSrc(p)).then(function (r) { return r.blob(); }); }
+  function touchDevice() { return window.matchMedia && window.matchMedia("(pointer: coarse)").matches; }
+  function saveImage(p) {
+    imgBlob(p).then(function (blob) {
+      var file = null; try { file = new File([blob], imgName(p), { type: blob.type || "image/jpeg" }); } catch (e) {}
+      if (file && touchDevice() && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file] }).catch(function () {});
+        return;
+      }
+      var url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = imgName(p); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      toast("Image downloaded");
+    }, function () { toast("Couldn't get the image. Press and hold it to save it instead."); });
+  }
+  function copyImage(p) {
+    if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) { toast("Copying images isn't available here. Use Download image."); return; }
+    var png = imgBlob(p).then(function (blob) {
+      return new Promise(function (res, rej) {
+        var im = new Image(), u = URL.createObjectURL(blob);
+        im.onload = function () { var c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext("2d").drawImage(im, 0, 0); URL.revokeObjectURL(u); c.toBlob(function (b) { b ? res(b) : rej(); }, "image/png"); };
+        im.onerror = rej; im.src = u;
+      });
+    });
+    try {
+      navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).then(function () { toast("Image copied. Paste it into your Skool post."); }, function () { toast("Couldn't copy the image. Use Download image."); });
+    } catch (e) { toast("Couldn't copy the image. Use Download image."); }
+  }
   function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
   $("dayBody").addEventListener("input", function (e) {
     var p = curP(); if (!p) return;
@@ -767,6 +821,7 @@
     if (e.target.id === "sBody") { p.body = e.target.value; grow(e.target); save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
+    if (e.target.id === "pFor") { var pf = curP(); pf.for = e.target.value; save(); toast("Set to " + forLabel(pf.for)); renderDay(curDay); return; }
     if (e.target.id !== "moveDay") return;
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
   });
@@ -782,7 +837,7 @@
     var a = e.target.closest("[data-act]"); if (!a) return;
     var act = a.getAttribute("data-act"), p = curP();
     if (act === "paste-here") { $("dayAdd").hidden = false; $("dayAddText").focus(); }
-    if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay); if (n) { toast("Added " + n + (n === 1 ? " post" : " posts")); curPost[curDay] = S.posts[S.posts.length - n].id; renderDay(curDay); } }
+    if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay, p ? pFor(p) : "promo"); if (n) { toast("Added " + n + (n === 1 ? " post" : " posts")); curPost[curDay] = S.posts[S.posts.length - n].id; renderDay(curDay); } }
     if (!p) return;
     if (act === "copy-title") copy(p.title, "Title copied", $("sTitle"));
     if (act === "copy-body") copyPost(p.body);
@@ -797,6 +852,8 @@
     }
     if (act === "copy-img") copy(p.imgPrompt, "Image prompt copied");
     if (act === "img") { pickFor = p.id; picker.click(); }
+    if (act === "img-save") saveImage(p);
+    if (act === "img-copy") copyImage(p);
     if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
     if (act === "delete") arm(a, "Delete this post", "Tap again to delete", function () { S.posts = S.posts.filter(function (x) { return x.id !== p.id; }); delete curPost[curDay]; save(); toast("Post deleted"); renderDay(curDay); });
   });
@@ -810,7 +867,9 @@
   function buildPrompt() {
     var b = S.build, n = +b.versions || 1;
     var about = (b.about || "").trim(), promo = (b.promo || "").trim(), link = (b.link || "").trim();
-    var s = "Write " + WHERE[b.where] + ", in my voice." + (MEMBER
+    var cg = b.where === "community" ? S.groups.find(function (g) { return g.id === b.forId && g.mine; }) : null;
+    var what = b.where === "community" && cg && cg.name ? "a post for my own Skool community, " + cg.name + ", talking to my members like friends who already know me" : WHERE[b.where];
+    var s = "Write " + what + ", in my voice." + (MEMBER
         ? "\n\nFirst, use what you already know about me from our past chats, your memory of me and any projects or files I've shared: my name, my business, who I help, how I talk, how I sign off and my brand colors. If you don't know enough to sound like me, ask me 2 or 3 quick questions first, all at once, and wait for my answers.\n\n"
         : " I'm Aurailia Arnold.\n\n") +
       "WHAT I WANT TO SAY (my own words, from a voice note)\n" + (about || "[say what the post is about]") + "\n\n" +
@@ -852,19 +911,26 @@
     document.querySelectorAll("[data-where]").forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-where") === b.where); });
     document.querySelectorAll("[data-v]").forEach(function (c) { c.classList.toggle("on", +c.getAttribute("data-v") === +b.versions); });
     $("bDay").innerHTML = dayOptions(todayIdx());
+    var mg = mineGroups();
+    if (b.where === "community" && !mg.some(function (g) { return g.id === b.forId; })) b.forId = mg.length ? mg[0].id : "";
+    $("bForWrap").hidden = b.where !== "community";
+    $("bFor").hidden = !mg.length; $("bForHint").hidden = !!mg.length;
+    $("bFor").innerHTML = mg.map(function (g) { return '<option value="' + g.id + '"' + (g.id === b.forId ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("");
+    $("bAddFor").innerHTML = forOptions(b.where === "community" && b.forId ? b.forId : b.where === "social" ? "social" : "promo");
     $("bOut").textContent = buildPrompt();
   }
   function bSync() { $("bOut").textContent = buildPrompt(); save(); }
   ["bAbout", "bPromo", "bLink"].forEach(function (id) {
     $(id).addEventListener("input", function () { S.build[{ bAbout: "about", bPromo: "promo", bLink: "link" }[id]] = this.value; bSync(); });
   });
+  $("bFor").addEventListener("change", function () { S.build.forId = this.value; renderBuild(); save(); });
   $("bSells").addEventListener("change", function () { S.build.sells = this.checked; bSync(); });
   $("bImg").addEventListener("change", function () { S.build.img = this.checked; bSync(); });
   $("bWhere").addEventListener("click", function (e) { var c = e.target.closest("[data-where]"); if (!c) return; S.build.where = c.getAttribute("data-where"); renderBuild(); save(); });
   $("bVers").addEventListener("click", function (e) { var c = e.target.closest("[data-v]"); if (!c) return; S.build.versions = +c.getAttribute("data-v"); renderBuild(); save(); });
   $("bCopy").addEventListener("click", function () { copy(buildPrompt(), "Prompt copied. Paste it into Claude."); });
   $("bAdd").addEventListener("click", function () {
-    var d = +$("bDay").value, n = addPosts($("bBack").value, d);
+    var d = +$("bDay").value, n = addPosts($("bBack").value, d, $("bAddFor").value);
     if (n) { $("bBack").value = ""; S.build.about = ""; save(); toast("Added " + n + (n === 1 ? " post" : " posts") + " to " + DAYS[d]); go(slug(d)); }
   });
 
@@ -896,12 +962,16 @@
         '<input type="text" aria-label="Group name" data-f="name" value="' + esc(g.name) + '" placeholder="Group name">' +
         '<input class="glink" type="url" aria-label="Group link" data-f="link" value="' + esc(g.link) + '" placeholder="https://www.skool.com/...">' +
         '<button class="btn small danger" type="button" data-gdel>Remove</button></div>' +
-        '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
+        '<div class="gdays" role="group" aria-label="What kind of group"><span class="gdl">This is</span>' +
+        '<button type="button" class="dchip' + (g.mine ? "" : " on") + '" data-gmine="0" aria-pressed="' + !g.mine + '">A promo group</button>' +
+        '<button type="button" class="dchip' + (g.mine ? " on" : "") + '" data-gmine="1" aria-pressed="' + !!g.mine + '">My community</button></div>' +
+        (g.mine ? '<p class="mine-note">Any post you set for this community shows it here, on any day. No limits to track.</p></div>' : "") +
+        (g.mine ? "" : '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
         DAYS.map(function (d, i) { return '<button type="button" class="dchip' + (days.indexOf(i) !== -1 ? " on" : "") + '" data-gday="' + i + '" aria-pressed="' + (days.indexOf(i) !== -1) + '">' + d.slice(0, 3) + "</button>"; }).join("") +
         "</div>" +
         '<div class="gdays" role="group" aria-label="Posts a day"><span class="gdl">Posts a day</span>' +
         [[1, "1"], [2, "2"], [0, "Unlimited"]].map(function (o) { return '<button type="button" class="dchip' + (gLimit(g) === o[0] ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + (gLimit(g) === o[0]) + '">' + o[1] + "</button>"; }).join("") +
-        "</div></div>";
+        "</div></div>");
     }).join("") : '<p class="hint">No groups yet. Add the communities you promote in.</p>';
   }
   $("gList").addEventListener("input", function (e) {
@@ -910,6 +980,11 @@
     g[e.target.getAttribute("data-f")] = e.target.value.trim(); save();
   });
   $("gList").addEventListener("click", function (e) {
+    var mc = e.target.closest("[data-gmine]");
+    if (mc) {
+      var gm = S.groups.find(function (x) { return x.id === mc.closest("[data-g]").getAttribute("data-g"); });
+      gm.mine = mc.getAttribute("data-gmine") === "1"; save(); renderGroups(); return;
+    }
     var lc = e.target.closest("[data-glim]");
     if (lc) {
       var gl = S.groups.find(function (x) { return x.id === lc.closest("[data-g]").getAttribute("data-g"); });
