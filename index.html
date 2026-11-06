@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>She Posts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: a plum planner. Week board of seven day cards, a day page that previews each post the way Skool shows it, a Build tab that turns a voice note into a Claude prompt. */
+  :root {
+    --bg: #1f0d1b;
+    --surface: #2c1428;
+    --surface-2: #381a33;
+    --line: #4d2a46;
+    --line-strong: #6b4262;
+    --fg: #fbeff3;
+    --muted: #d9bfcf;
+    --faint: #a98a9e;
+    --gold: #e8c47a;
+    --gold-bright: #f3d89b;
+    --on-gold: #2a1226;
+    --blush: #f4b6c8;
+    --teal: #6fd8c8;
+    --skool-bg: #ffffff;
+    --skool-fg: #202124;
+    --skool-muted: #6b6f76;
+    --skool-line: #e4e4e7;
+    --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --font-body: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 48px;
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  header.top {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding-block: 14px 12px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+  }
+  .brand { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: .01em; line-height: 1; }
+  .brand em { color: var(--blush); font-style: italic; }
+  .sync { font-family: var(--font-body); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; vertical-align: middle; margin-left: 6px; white-space: nowrap; }
+  .sync.on { color: var(--teal); border-color: var(--teal); }
+  nav.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav.tabs a {
+    text-decoration: none; color: var(--muted); font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+  }
+  nav.tabs a.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(30px, 6vw, 42px); line-height: 1.05; margin: 0 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin: 0 0 8px; }
+  .hint { font-size: 13px; color: var(--faint); margin: 4px 0 0; }
+
+  .btn {
+    font: inherit; font-weight: 600; font-size: 14px; border-radius: 999px; padding: 10px 18px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: transparent; color: var(--fg); display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { border-color: var(--gold); }
+  .btn.primary { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .btn.primary:hover { background: var(--gold-bright); }
+  .btn.small { padding: 7px 13px; font-size: 13px; }
+  .btn.danger.armed { background: var(--blush); color: var(--on-gold); border-color: var(--blush); }
+  .btn:focus-visible, nav.tabs a:focus-visible, .day:focus-visible, .ptab:focus-visible, .chip:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  /* Week board */
+  .week { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .day {
+    text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  }
+  .day:hover { border-color: var(--gold); }
+  .day .dname { font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .day .count { font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .day .count.has { color: var(--teal); }
+  .thumb { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; object-fit: cover; background: var(--surface-2); display: block; max-width: 100%; }
+  .thumb.empty { display: grid; place-items: center; color: var(--faint); font-size: 13px; border: 1px dashed var(--line-strong); }
+  .day .ttl { font-size: 14px; font-weight: 600; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.9em; }
+  .day.today { border-color: var(--gold); }
+  .weekbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+
+  /* Panels */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 14px; font-weight: 600; }
+  input[type=text], input[type=url], textarea, select {
+    font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 12px; padding: 11px 13px; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--gold); outline-offset: 0; border-color: var(--gold); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font: inherit; font-size: 14px; font-weight: 500; color: var(--fg); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  .chip.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--gold); }
+  .out { white-space: pre-wrap; font-size: 13px; line-height: 1.5; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; max-height: 260px; overflow: auto; }
+  .stepnum { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: var(--on-gold); font-weight: 700; font-size: 13px; margin-right: 8px; }
+  .speak.live { background: var(--blush); color: var(--on-gold); border-color: var(--blush); }
+  .builds { display: grid; gap: 14px; }
+
+  /* Day page */
+  .back { color: var(--gold); text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin-bottom: 10px; }
+  .daynav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+  .daynav a { text-decoration: none; color: var(--muted); font-size: 13px; font-weight: 600; padding: 6px 11px; border-radius: 10px; border: 1px solid var(--line); }
+  .daynav a.on { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
+  .daynav a .n { color: inherit; opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .ptabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ptab { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); cursor: pointer; }
+  .ptab.on { background: var(--blush); color: var(--on-gold); border-color: var(--blush); }
+  .daygrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .daygrid { grid-template-columns: minmax(0, 1fr); } }
+
+  /* The Skool look */
+  .skool { background: var(--skool-bg); color: var(--skool-fg); border-radius: 14px; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.35); min-width: 0; }
+  .skool .who { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .skool .av { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--blush)); display: grid; place-items: center; color: var(--on-gold); font-weight: 700; font-size: 15px; }
+  .skool .nm { font-weight: 600; font-size: 15px; line-height: 1.2; }
+  .skool .meta { font-size: 13px; color: var(--skool-muted); }
+  .skool input.stitle {
+    width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-weight: 700; font-size: 19px; line-height: 1.3; padding: 4px 6px; margin: 0 -6px 4px; border-radius: 8px;
+  }
+  .skool textarea.sbody {
+    width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-size: 15.5px; line-height: 1.6; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; resize: none; overflow: hidden; min-height: 80px;
+  }
+  .skool input.stitle:hover, .skool textarea.sbody:hover { border-color: var(--skool-line); }
+  .skool input.stitle:focus, .skool textarea.sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
+  .skool .simg { margin-top: 12px; border-radius: 10px; overflow: hidden; border: 1px solid var(--skool-line); }
+  .skool .simg img { display: block; width: 100%; max-width: 100%; }
+  .skool .noimg { margin-top: 12px; border: 1.5px dashed #cfc8d0; border-radius: 10px; padding: 22px; text-align: center; color: var(--skool-muted); font-size: 14px; cursor: pointer; background: #faf7f9; }
+  .skool .noimg:hover { border-color: var(--gold); }
+  .skool .foot { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--skool-line); color: var(--skool-muted); font-size: 13px; }
+  .edit-tip { font-size: 12.5px; color: var(--faint); margin: 8px 2px 0; }
+
+  .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .glist { display: flex; flex-direction: column; gap: 8px; }
+  .gitem { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+  .gitem .gname { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .gitem .gname a { color: var(--fg); text-decoration: none; }
+  .gitem .gname a:hover { color: var(--gold); }
+  .tick { font: inherit; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 6px 12px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .tick.on { background: var(--teal); color: #0d2a26; border-color: var(--teal); }
+  .progress { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .empty-day { text-align: center; padding: 34px 18px; border: 1px dashed var(--line-strong); border-radius: 18px; color: var(--muted); }
+  .empty-day p { margin: 0 0 14px; }
+
+  /* Groups */
+  .gcard { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+  .gdays { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .gdl { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); margin-right: 4px; }
+  .dchip { font: inherit; font-size: 13px; font-weight: 600; min-width: 44px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line-strong); background: transparent; color: var(--faint); cursor: pointer; }
+  .dchip.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .glim { display: block; font-size: 12px; font-weight: 500; color: var(--faint); margin-top: 2px; }
+  .tick.full { opacity: .5; cursor: not-allowed; }
+  .day .gcount { font-size: 12px; color: var(--faint); }
+  .grow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; align-items: center; }
+  @media (max-width: 600px) { .grow { grid-template-columns: minmax(0, 1fr) auto; } .grow .glink { grid-column: 1 / -1; grid-row: 2; } }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--fg); color: var(--on-gold); font-weight: 600; font-size: 14px; padding: 11px 18px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100% - 32px); text-align: center; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">She <em>Posts</em>&trade; <span class="sync" id="syncBadge">Saved on this device</span></div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#week" data-nav="week">My week</a>
+      <a href="#build" data-nav="build">Build a post</a>
+      <a href="#groups" data-nav="groups">My groups</a>
+    </nav>
+  </header>
+
+  <!-- WEEK -->
+  <section id="vWeek">
+    <h1>This week's posts</h1>
+    <p class="lede">Tap a day to see its posts the way they'll look in Skool. Edit the title or the post right there, then copy and share.</p>
+    <div class="weekbar">
+      <div class="row">
+        <a class="btn primary" href="#build">&#127908; Build a post</a>
+        <button class="btn" type="button" id="openAdd">&#10133; Paste a post</button>
+      </div>
+      <div class="row">
+        <button class="btn small" type="button" id="moveOpen">&#128228; Move my week</button>
+        <button class="btn small" type="button" id="pasteOpen">&#128229; Paste my week</button>
+        <button class="btn small danger" type="button" id="clearWeek">Clear the week</button>
+      </div>
+    </div>
+    <div class="panel" id="movePanel" hidden style="margin-bottom:16px">
+      <h2>Move my week to another device</h2>
+      <p class="hint" style="margin:0">Send this link to yourself (text, email or AirDrop) and open it on your other phone or computer. Your posts, titles and groups come with it. Images stay on this device, so add them where you post from.</p>
+      <div class="out" id="moveOut" style="max-height:110px;overflow-wrap:anywhere"></div>
+      <div class="row"><button class="btn primary" type="button" id="moveCopy">Copy the link</button><button class="btn" type="button" id="moveClose">Done</button></div>
+    </div>
+    <div class="panel" id="pastePanel" hidden style="margin-bottom:16px">
+      <h2>Paste my week</h2>
+      <p class="hint" style="margin:0">This replaces the week on this device with the one you moved. Images already on this device stay put.</p>
+      <div class="field"><label for="pasteText" class="sr">Your week link</label><textarea id="pasteText" style="min-height:90px" placeholder="Paste the link you copied"></textarea></div>
+      <div class="row"><button class="btn primary" type="button" id="pasteGo">Replace my week</button><button class="btn" type="button" id="pasteClose">Cancel</button></div>
+    </div>
+    <div class="panel" id="addPanel" hidden style="margin-bottom:16px">
+      <div class="field">
+        <label for="addText">Paste your post</label>
+        <textarea id="addText" placeholder="Paste a post here. The first line becomes the title."></textarea>
+        <p class="hint">Pasting what Claude wrote from the Build tab? All the versions get split into separate posts.</p>
+      </div>
+      <div class="row">
+        <select id="addDay" aria-label="Which day"></select>
+        <button class="btn primary" type="button" id="addGo">Add to the day</button>
+        <button class="btn" type="button" id="addCancel">Cancel</button>
+      </div>
+    </div>
+    <div class="week" id="weekGrid"></div>
+  </section>
+
+  <!-- DAY -->
+  <section id="vDay" hidden>
+    <a class="back" href="#week">&larr; Back to the week</a>
+    <nav class="daynav" id="dayNav" aria-label="Days"></nav>
+    <h1 id="dayTitle">Monday</h1>
+    <div id="dayBody"></div>
+  </section>
+
+  <!-- BUILD -->
+  <section id="vBuild" hidden>
+    <h1>Build a post</h1>
+    <p class="lede">Talk it out like a voice note. You'll get a prompt with all your rules in it. Paste it into Claude, then paste what Claude writes back here.</p>
+    <div class="builds">
+      <div class="panel">
+        <h2><span class="stepnum">1</span>Say what's on your mind</h2>
+        <div class="field">
+          <label for="bAbout">What's this post about?</label>
+          <textarea id="bAbout" style="min-height:160px" placeholder="Just talk. What happened, what you want to say, who it's for, any story or moment you want in there..."></textarea>
+          <div class="row">
+            <button class="btn speak" type="button" id="speakBtn">&#127908; Speak</button>
+            <span class="hint" id="speakNote">Tap Speak and talk. Tap again to stop.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="bPromo">What are you promoting? (optional)</label>
+          <input id="bPromo" type="text" placeholder="e.g. She Promotes VIP, the Business Alignment Blueprint, Embody Wealth">
+        </div>
+        <div class="field">
+          <label for="bLink">Link (optional)</label>
+          <input id="bLink" type="url" placeholder="https://www.skool.com/...">
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2><span class="stepnum">2</span>Choose the details</h2>
+        <div class="field">
+          <span class="label">Where is it going?</span>
+          <div class="chips" id="bWhere" role="group" aria-label="Where is it going">
+            <button class="chip" type="button" data-where="promo">Promo groups</button>
+            <button class="chip" type="button" data-where="community">My community</button>
+            <button class="chip" type="button" data-where="social">Social media</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">How many versions?</span>
+          <div class="chips" id="bVers" role="group" aria-label="How many versions">
+            <button class="chip" type="button" data-v="1">1</button>
+            <button class="chip" type="button" data-v="2">2</button>
+            <button class="chip" type="button" data-v="3">3</button>
+          </div>
+          <p class="hint">Different versions get different titles and openings, so you're not posting the same thing in every group.</p>
+        </div>
+        <label class="check"><input type="checkbox" id="bSells"> Weave in She Sells&trade;</label>
+        <label class="check"><input type="checkbox" id="bImg"> Include an image prompt</label>
+      </div>
+
+      <div class="panel">
+        <h2><span class="stepnum">3</span>Copy your prompt into Claude</h2>
+        <div class="out" id="bOut"></div>
+        <div class="row"><button class="btn primary" type="button" id="bCopy">Copy prompt</button></div>
+      </div>
+
+      <div class="panel">
+        <h2><span class="stepnum">4</span>Paste what Claude wrote</h2>
+        <div class="field">
+          <label for="bBack" class="sr">What Claude wrote</label>
+          <textarea id="bBack" placeholder="Paste Claude's whole answer here. Each version becomes its own post."></textarea>
+        </div>
+        <div class="row">
+          <select id="bDay" aria-label="Which day"></select>
+          <button class="btn primary" type="button" id="bAdd">Add to the day</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GROUPS -->
+  <section id="vGroups" hidden>
+    <h1>My groups</h1>
+    <p class="lede">The communities you post in. Set the days each group lets you promote and how many posts a day it allows. Each day only shows the groups you can post in, and keeps count for you.</p>
+    <div class="panel">
+      <div class="glist" id="gList"></div>
+      <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a group</button></div>
+      <p class="hint">Everything saves on this device. To use your week on another phone or computer, tap Move my week on the My week page.</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+  var DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  var KEY = "sp-promo-week-v1";
+  var MEMBER = true;
+  var SIGNOFF = "I believe in you. To living our dreams. \u2014 Aurailia \u2726";
+
+  var PLAYBOOK = [
+    "HOW PEOPLE BUY",
+    "- Feeling first, logic after. People decide with how something will feel, then use details to back it up. Lead with what life feels like after, then give the details.",
+    "- People buy when they see themselves. Use small, real moments the buyer lives (\"you rewrote your bio three times this week\"), not general labels (\"you feel overwhelmed\").",
+    "- Specific beats general. If a sentence could sit in anyone else's post, rewrite it with a real detail.",
+    "- Trust comes before the sale. People buy from people they know, like and trust. Helpful, honest posts build that over time, even when nobody buys today.",
+    "- A small yes before a big yes. Give an easy first step (comment, freebie, join) before asking for a big purchase.",
+    "- Too many choices means no choice. One offer per post. One clear next step.",
+    "- Many buyers decide in emotional waves. In Human Design this is Emotional Authority: clarity comes once the feeling settles, not in the high or the low. Give room to decide. Never push someone in a low.",
+    "- Meet buyers in the low after they buy. Mention the quick first win they get right away.",
+    "- Proof beats promises. Use real wins and words from real clients, shared with permission. Never invent them.",
+    "- Give first. Real value up front makes people want to give back.",
+    "- People resist pressure. The harder you push, the more they protect their right to say no.",
+    "",
+    "HOW TO SELL WITHOUT THE ICK",
+    "- Say the price calmly, like a fact. No apologizing, no explaining why it's worth it, no discount before anyone asks.",
+    "- Invite instead of convince: \"If you're ready for [result], here's where to start.\"",
+    "- Real deadlines only. A price that really goes up, a real start date, real limited spots. No fake scarcity or \"last chance\" that isn't.",
+    "- Show what's inside, how they get it, and what's NOT included. Being upfront about limits makes everything else believable.",
+    "- Say what changes for them, not just what's included: \"[feature], so you can [result]\". Don't promise results you can't back up.",
+    "- Ask for the step they're ready for. When the goal is a sale, ask for the sale with the link. Don't swap in \"comment below\" when you want a purchase.",
+    "",
+    "HOW TO WRITE THE POST",
+    "- A hook title under 70 characters that speaks to the reader: a question they'd answer yes to, a moment they know, or a surprising truth. Nothing the post doesn't deliver.",
+    "- Open with a moment the reader recognizes before mentioning the offer.",
+    "- One idea per sentence. Short sentences. Plain everyday words. Contractions. Like talking to a friend, not an ad.",
+    "- End with one clear next step.",
+    "- No em dashes or en dashes, no hashtags, no markdown, no hype, no guilt.",
+    "- Never use: imagine, picture this, here's the thing, the truth is, let's be honest, game-changer, unlock, unleash, elevate, embrace, journey, transform, empower, dive in, level up, scale, high-vibe, aligned action, \"it's not X, it's Y\", \"you're not X, you're Y\".",
+    "- No lists of three just for rhythm. Don't announce what you're about to say. Just say it.",
+    "- Never invent results, prices, dates, testimonials or stories. Leave a [bracket] for anything you don't know.",
+    "- Don't assume the reader or their buyers are women unless told."
+  ].join("\n");
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function slug(d) { return DAYS[d].toLowerCase(); }
+
+  var SEED = {
+    posts: [{
+      id: "seed1", day: 0, title: "📚 I came out of my cave with something for you 🧹",
+      body: "Okay, confession time 🙈\n\nYou know how I've been a little quiet the last few days? I was in my cave. That's my 2 line in Human Design. I disappear, I create, and then I come back out with something I can't wait to share.\n\nSo... here's what I made.\n\n(Example post. Edit it, or delete it and add your own.)",
+      img: "", imgPrompt: "", posted: {}
+    }],
+    groups: [
+      { id: "g1", name: "She Promotes™", link: "https://www.skool.com/she-promotes-7924" },
+      { id: "g2", name: "Promote Today", link: "" },
+      { id: "g3", name: "The Promo Lounge", link: "" }
+    ],
+    build: { about: "", promo: "", link: "", where: "promo", versions: 2, sells: true, img: true }
+  };
+  if (MEMBER) {
+    SEED.posts = [{ id: "seed1", day: 0, title: "\uD83D\uDC4B Example: Who should we send your way?",
+      body: "This is an example post so you can see how it works.\n\nTap the title or the post to change it. Add an image underneath. Then copy it and share it in your groups.\n\nDelete it whenever you're ready to add your own.", img: "", imgPrompt: "", posted: {} }];
+    SEED.groups = [{ id: "g1", name: "She Promotes\u2122", link: "https://www.skool.com/she-promotes-7924", days: [0, 1, 2, 3, 4, 5, 6], limit: 1 }];
+  }
+  var S;
+  function load() {
+    try { var raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); } } catch (e) {}
+    if (!S || !S.posts) S = JSON.parse(JSON.stringify(SEED));
+    S.build = Object.assign({}, SEED.build, S.build || {});
+    S.groups = S.groups || [];
+  }
+  function save() {
+    S.updatedAt = Date.now();
+    queueCloud();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
+    catch (e) { if (cloud) return true; toast("Storage is full. Remove an image or clear the week, then try again."); return false; }
+  }
+
+  /* ---------- move my week between devices ---------- */
+  function b64u(bytes) { var s = ""; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  function unb64u(str) { str = str.replace(/-/g, "+").replace(/_/g, "/"); while (str.length % 4) str += "="; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
+  function streamBytes(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function packWeek() {
+    var data = { posts: S.posts.map(function (p) { return { id: p.id, day: p.day, title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", posted: p.posted || {} }; }), groups: S.groups, build: S.build, updatedAt: S.updatedAt || Date.now() };
+    var bytes = new TextEncoder().encode(JSON.stringify(data));
+    if (typeof CompressionStream === "function") return streamBytes(bytes, new CompressionStream("deflate-raw")).then(function (z) { return "import-z" + b64u(z); });
+    return Promise.resolve("import-p" + b64u(bytes));
+  }
+  function unpackWeek(code) {
+    var m = String(code).match(/import-([zp])([A-Za-z0-9_-]+)/);
+    if (!m) return Promise.reject(new Error("bad"));
+    var bytes = unb64u(m[2]);
+    var p = m[1] === "z" ? streamBytes(bytes, new DecompressionStream("deflate-raw")) : Promise.resolve(bytes);
+    return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
+  }
+  function weekLink(code) { return location.href.split("#")[0] + "#" + code; }
+  function applyWeek(data) {
+    var localImg = {}; S.posts.forEach(function (p) { if (p.img || p.imgId) localImg[p.id] = { img: p.img, imgId: p.imgId }; });
+    S.posts = (data.posts || []).map(function (p) { var li = localImg[p.id] || {}; return Object.assign({ img: li.img || "", imgId: li.imgId || "" }, p, { posted: p.posted || {} }); });
+    S.groups = data.groups || S.groups; S.build = Object.assign({}, SEED.build, data.build || {});
+    save();
+  }
+
+  /* ---------- sync across phone and computer (works when opened in Claude) ---------- */
+  var cloud = null, assets = null, cloudTimer = null, writing = false, again = false;
+  function cloudState() {
+    var c = JSON.parse(JSON.stringify(S));
+    c.posts.forEach(function (p) { if (p.img && p.img.indexOf("data:") === 0) p.img = ""; });
+    return c;
+  }
+  function queueCloud() {
+    if (!cloud) return;
+    clearTimeout(cloudTimer); cloudTimer = setTimeout(pushCloud, 800);
+  }
+  function pushCloud() {
+    if (!cloud) return;
+    if (writing) { again = true; return; }
+    writing = true;
+    cloud.set({ state: cloudState() }).then(function () { badge(true); }, function (e) {
+      if (e && e.code === "quota_exceeded") toast("Your synced space is full. Clear the week to make room.");
+    }).then(function () { writing = false; if (again) { again = false; pushCloud(); } });
+  }
+  function badge(on) { var b = $("syncBadge"); b.textContent = on ? "Synced" : "Saved on this device"; b.classList.toggle("on", !!on); }
+  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : (p.img || ""); }
+  function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); }
+  function dataUrlToBlob(u) {
+    var parts = u.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: (parts[0].match(/data:([^;]+)/) || [])[1] || "image/jpeg" });
+  }
+  var migrating = false;
+  function migrateImages() {
+    if (!assets || migrating) return;
+    var p = S.posts.find(function (x) { return x.img && x.img.indexOf("data:") === 0 && !x.imgId; });
+    if (!p) return;
+    migrating = true;
+    assets.upload(dataUrlToBlob(p.img)).then(function (a) { p.imgId = a.id; p.img = ""; save(); }, function () {}).then(function () { migrating = false; migrateImages(); });
+  }
+
+  var toastT;
+  function toast(msg) { var t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600); }
+  function copy(text, okMsg, fallbackEl) {
+    function fb() {
+      if (fallbackEl) { try { fallbackEl.focus(); fallbackEl.select(); } catch (e) {} toast("Select all and copy it from the box"); }
+      else toast("Couldn't copy. Select the text and copy it instead.");
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fb);
+      else fb();
+    } catch (e) { fb(); }
+  }
+  /* two-step confirm without dialogs */
+  function arm(btn, label, armedLabel, fn) {
+    if (btn.classList.contains("armed")) { btn.classList.remove("armed"); btn.textContent = label; fn(); return; }
+    btn.classList.add("armed"); btn.textContent = armedLabel;
+    setTimeout(function () { if (btn.classList.contains("armed")) { btn.classList.remove("armed"); btn.textContent = label; } }, 3500);
+  }
+
+  function gDays(g) { return Array.isArray(g.days) ? g.days : [0, 1, 2, 3, 4, 5, 6]; }
+  function gLimit(g) { return g.limit === 0 ? 0 : (g.limit || 1); }
+  function usedOn(g, d) { return postsFor(d).filter(function (p) { return p.posted && p.posted[g.id]; }).length; }
+  function groupsFor(d) { return S.groups.filter(function (g) { return gDays(g).indexOf(d) !== -1; }); }
+  function postsFor(d) { return S.posts.filter(function (p) { return p.day === d; }); }
+  function todayIdx() { var d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
+
+  /* ---------- parsing pasted posts ---------- */
+  function parseOne(chunk) {
+    var text = chunk.replace(/\r/g, "").trim();
+    if (!text) return null;
+    var imgPrompt = "";
+    var im = text.search(/^\s*IMAGE PROMPT:?\s*$/im);
+    if (im === -1) im = text.search(/^\s*IMAGE PROMPT:/im);
+    if (im !== -1) { imgPrompt = text.slice(im).replace(/^\s*IMAGE PROMPT:?\s*/i, "").trim(); text = text.slice(0, im).trim(); }
+    var title = "", body = text;
+    var tm = text.match(/^\s*TITLE:\s*(.+)$/im);
+    if (tm) {
+      title = tm[1].trim();
+      body = text.slice(text.indexOf(tm[0]) + tm[0].length);
+    } else {
+      var lines = text.split("\n"); while (lines.length && !lines[0].trim()) lines.shift();
+      title = (lines.shift() || "").trim(); body = lines.join("\n");
+    }
+    body = body.replace(/^\s*POST:\s*\n?/i, "").replace(/^\n+/, "").replace(/\s+$/, "");
+    title = title.replace(/^\*\*|\*\*$/g, "");
+    return { id: uid(), day: 0, title: title, body: body, img: "", imgPrompt: imgPrompt, posted: {} };
+  }
+  function parsePaste(text) {
+    var parts = text.replace(/\r/g, "").split(/^\s*(?:#+\s*)?\**\s*VERSION\s+\d+\s*\**\s*:?\s*$/im);
+    var out = [];
+    parts.forEach(function (c) { var p = parseOne(c); if (p && (p.title || p.body)) out.push(p); });
+    /* drop a lone intro chunk with no TITLE when versions exist */
+    if (parts.length > 1 && parts[0].trim() && out.length > 1 && !/^\s*TITLE:/im.test(parts[0]) && parts[0].trim().split("\n").length < 4) out.shift();
+    return out;
+  }
+  function addPosts(text, day) {
+    var list = parsePaste(text);
+    if (!list.length) { toast("Paste a post first"); return 0; }
+    list.forEach(function (p) { p.day = day; S.posts.push(p); });
+    save();
+    return list.length;
+  }
+
+  /* ---------- images ---------- */
+  function shrink(file, cb) {
+    var r = new FileReader();
+    r.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 1080, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        cb(c.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = function () { toast("That image couldn't be opened. Try a JPG or PNG."); };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  }
+  var picker = document.createElement("input"); picker.type = "file"; picker.accept = "image/*"; picker.hidden = true; document.body.appendChild(picker);
+  var pickFor = null;
+  picker.addEventListener("change", function () {
+    var f = picker.files && picker.files[0]; if (!f || !pickFor) return;
+    var p = S.posts.find(function (x) { return x.id === pickFor; });
+    shrink(f, function (data) {
+      if (assets) {
+        toast("Adding your image...");
+        assets.upload(dataUrlToBlob(data)).then(function (a) { p.imgId = a.id; p.img = ""; save(); renderDay(curDay); toast("Image added"); },
+          function () { var old = p.img; p.img = data; if (!save()) p.img = old; renderDay(curDay); });
+        return;
+      }
+      var old = p.img; p.img = data; if (!save()) { p.img = old; } renderDay(curDay);
+    });
+    picker.value = "";
+  });
+
+  /* ---------- views ---------- */
+  var curDay = 0, curPost = {};
+  function show(view) {
+    ["vWeek", "vDay", "vBuild", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
+    var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : "groups";
+    document.querySelectorAll("[data-nav]").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-nav") === nav); });
+  }
+  function route(keep) {
+    var raw = (location.hash || "").replace("#", "");
+    if (raw.indexOf("import-") === 0) {
+      try { history.replaceState(null, "", location.href.split("#")[0] + "#week"); } catch (e) {}
+      show("vWeek"); renderWeek();
+      $("pasteText").value = location.href.split("#")[0] + "#" + raw; $("pastePanel").hidden = false; $("movePanel").hidden = true;
+      toast("Tap Replace my week to bring it in");
+      return;
+    }
+    var h = raw.toLowerCase();
+    var d = DAYS.map(function (x) { return x.toLowerCase(); }).indexOf(h);
+    if (d !== -1) { curDay = d; show("vDay"); renderDay(d); }
+    else if (h === "build") { show("vBuild"); renderBuild(); }
+    else if (h === "groups") { show("vGroups"); renderGroups(); }
+    else { show("vWeek"); renderWeek(); }
+    if (keep !== true) window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", function () { route(); });
+  /* move between views without relying on the browser's hash handling */
+  function go(h) {
+    try { history.replaceState(null, "", location.href.split("#")[0] + "#" + h); } catch (e) { try { location.hash = h; } catch (e2) {} }
+    route();
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    go(a.getAttribute("href").slice(1));
+  });
+
+  function dayOptions(sel) {
+    return DAYS.map(function (d, i) { return '<option value="' + i + '"' + (i === sel ? " selected" : "") + ">" + d + "</option>"; }).join("");
+  }
+
+  function renderWeek() {
+    var t = todayIdx();
+    $("weekGrid").innerHTML = DAYS.map(function (d, i) {
+      var ps = postsFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
+      return '<button class="day' + (i === t ? " today" : "") + '" type="button" data-day="' + i + '">' +
+        '<span class="dname">' + d + '<span class="count' + (ps.length ? " has" : "") + '">' + (ps.length ? ps.length + (ps.length === 1 ? " post" : " posts") : "Nothing yet") + '</span></span>' +
+        (withImg ? '<img class="thumb" alt="" src="' + esc(imgSrc(withImg)) + '">' : '<span class="thumb empty">' + (ps.length ? "No image yet" : "Tap to add") + '</span>') +
+        '<span class="ttl">' + (first ? esc(first.title || "Untitled post") : "&nbsp;") + '</span>' +
+        '<span class="gcount">' + groupsFor(i).length + (groupsFor(i).length === 1 ? " group" : " groups") + " to post in</span></button>";
+    }).join("");
+    $("addDay").innerHTML = dayOptions(t);
+  }
+  $("weekGrid").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-day]"); if (b) go(slug(+b.getAttribute("data-day")));
+  });
+  $("openAdd").addEventListener("click", function () { $("addPanel").hidden = false; $("addText").focus(); });
+  $("addCancel").addEventListener("click", function () { $("addPanel").hidden = true; });
+  $("addGo").addEventListener("click", function () {
+    var d = +$("addDay").value, n = addPosts($("addText").value, d);
+    if (n) { $("addText").value = ""; $("addPanel").hidden = true; toast("Added " + n + (n === 1 ? " post" : " posts") + " to " + DAYS[d]); renderWeek(); }
+  });
+  $("moveOpen").addEventListener("click", function () {
+    $("pastePanel").hidden = true; $("movePanel").hidden = false; $("moveOut").textContent = "Making your link...";
+    packWeek().then(function (code) { $("moveOut").textContent = weekLink(code); }, function () { $("moveOut").textContent = "Something went wrong making the link. Try again."; });
+  });
+  $("moveCopy").addEventListener("click", function () { var t = $("moveOut").textContent; if (t.indexOf("#import-") === -1) return; copy(t, "Link copied. Send it to yourself."); });
+  $("moveClose").addEventListener("click", function () { $("movePanel").hidden = true; });
+  $("pasteOpen").addEventListener("click", function () { $("movePanel").hidden = true; $("pastePanel").hidden = false; $("pasteText").focus(); });
+  $("pasteClose").addEventListener("click", function () { $("pastePanel").hidden = true; });
+  $("pasteGo").addEventListener("click", function () {
+    var btn = this;
+    arm(btn, "Replace my week", "Tap again to replace", function () {
+      unpackWeek($("pasteText").value).then(function (data) {
+        applyWeek(data); $("pasteText").value = ""; $("pastePanel").hidden = true; renderWeek(); toast("Your week is here");
+      }, function () { toast("That link didn't work. Copy the whole link and try again."); });
+    });
+  });
+  $("clearWeek").addEventListener("click", function () {
+    arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); renderWeek(); toast("Your week is clear"); });
+  });
+
+  function grow(el) { el.style.height = "auto"; el.style.height = (el.scrollHeight + 4) + "px"; }
+
+  function renderDay(d) {
+    $("dayTitle").textContent = DAYS[d];
+    $("dayNav").innerHTML = DAYS.map(function (x, i) { var n = postsFor(i).length; return '<a href="#' + slug(i) + '" class="' + (i === d ? "on" : "") + '">' + x.slice(0, 3) + (n ? '<span class="n">' + n + "</span>" : "") + "</a>"; }).join("");
+    var ps = postsFor(d);
+    if (!ps.length) {
+      $("dayBody").innerHTML = '<div class="empty-day"><p>No posts for ' + DAYS[d] + ' yet.</p><div class="row" style="justify-content:center"><a class="btn primary" href="#build">&#127908; Build a post</a><button class="btn" type="button" data-act="paste-here">&#10133; Paste a post</button></div></div>' +
+        '<div class="panel" id="dayAdd" hidden style="margin-top:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>';
+      return;
+    }
+    var cur = ps.find(function (p) { return p.id === curPost[d]; }) || ps[0]; curPost[d] = cur.id;
+    var today = groupsFor(d), off = S.groups.length - today.length;
+    var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
+    $("dayBody").innerHTML =
+      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + "</button>"; }).join("") +
+      '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
+      '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
+      '<div class="daygrid"><div>' +
+        '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
+        '<label class="sr" for="sTitle">Title</label><input class="stitle" id="sTitle" type="text" value="' + esc(cur.title) + '" placeholder="Add a title">' +
+        '<label class="sr" for="sBody">Post</label><textarea class="sbody" id="sBody" placeholder="Write your post">' + esc(cur.body) + "</textarea>" +
+        (imgSrc(cur) ? '<div class="simg"><img alt="Post image" src="' + esc(imgSrc(cur)) + '"></div>' : '<div class="noimg" data-act="img" role="button" tabindex="0">&#128247; Add an image</div>') +
+        '<div class="foot"><span>&#128077; Like</span><span>&#128172; Comment</span></div></div>' +
+        '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type.</p>' +
+      '</div><div class="side">' +
+        '<div class="panel"><span class="label">Copy</span><div class="row">' +
+          '<button class="btn primary small" type="button" data-act="copy-title">Copy title</button>' +
+          '<button class="btn primary small" type="button" data-act="copy-body">Copy post</button>' +
+          (cur.imgPrompt ? '<button class="btn small" type="button" data-act="copy-img">Copy image prompt</button>' : "") +
+        '</div><div class="row">' +
+          '<button class="btn small" type="button" data-act="img">' + (imgSrc(cur) ? "Change image" : "Add image") + "</button>" +
+          (imgSrc(cur) ? '<button class="btn small" type="button" data-act="img-remove">Remove image</button>' : "") +
+        "</div></div>" +
+        '<div class="panel"><div class="row" style="justify-content:space-between"><span class="label" style="margin:0">Where I’m posting</span><span class="progress">' + done + " of " + today.length + " done</span></div>" +
+          (today.length ? '<div class="glist">' + today.map(function (g) {
+            var lim = gLimit(g), used = usedOn(g, d), mine = !!cur.posted[g.id], full = lim && used >= lim && !mine;
+            return '<div class="gitem"><span class="gname">' + (g.link ? '<a href="' + esc(g.link) + '" target="_blank" rel="noopener">' + esc(g.name) + " &#8599;</a>" : esc(g.name)) +
+              '<span class="glim">' + (lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span></span>" +
+              '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Posted" : full ? "Full today" : "Mark posted") + "</button></div>";
+          }).join("") + "</div>" : '<p class="hint">' + (S.groups.length ? "None of your groups take promos on " + DAYS[d] + "." : "Add your groups in") + ' <a href="#groups" style="color:var(--gold)">My groups</a>' + (S.groups.length ? " to change their days." : ".") + "</p>") +
+          (today.length && off ? '<p class="hint">' + off + (off === 1 ? " group doesn\u2019t" : " groups don\u2019t") + " take promos on " + DAYS[d] + '. <a href="#groups" style="color:var(--gold)">Change days</a></p>' : "") +
+        "</div>" +
+        '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
+          '<div class="row"><button class="btn small danger" type="button" data-act="delete">Delete this post</button></div></div>' +
+      "</div></div>";
+    grow($("sBody"));
+  }
+  function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
+  $("dayBody").addEventListener("input", function (e) {
+    var p = curP(); if (!p) return;
+    if (e.target.id === "sTitle") { p.title = e.target.value; save(); }
+    if (e.target.id === "sBody") { p.body = e.target.value; grow(e.target); save(); }
+  });
+  $("dayBody").addEventListener("change", function (e) {
+    if (e.target.id !== "moveDay") return;
+    var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
+  });
+  $("dayBody").addEventListener("keydown", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
+  $("dayBody").addEventListener("click", function (e) {
+    var t = e.target.closest("[data-post]"); if (t) { curPost[curDay] = t.getAttribute("data-post"); renderDay(curDay); return; }
+    var k = e.target.closest("[data-tick]");
+    if (k) { var p0 = curP(), gid = k.getAttribute("data-tick"); p0.posted[gid] = !p0.posted[gid]; save(); renderDay(curDay); return; }
+    var a = e.target.closest("[data-act]"); if (!a) return;
+    var act = a.getAttribute("data-act"), p = curP();
+    if (act === "paste-here") { $("dayAdd").hidden = false; $("dayAddText").focus(); }
+    if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay); if (n) { toast("Added " + n + (n === 1 ? " post" : " posts")); curPost[curDay] = S.posts[S.posts.length - n].id; renderDay(curDay); } }
+    if (!p) return;
+    if (act === "copy-title") copy(p.title, "Title copied", $("sTitle"));
+    if (act === "copy-body") copy(p.body, "Post copied", $("sBody"));
+    if (act === "copy-img") copy(p.imgPrompt, "Image prompt copied");
+    if (act === "img") { pickFor = p.id; picker.click(); }
+    if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
+    if (act === "delete") arm(a, "Delete this post", "Tap again to delete", function () { S.posts = S.posts.filter(function (x) { return x.id !== p.id; }); delete curPost[curDay]; save(); toast("Post deleted"); renderDay(curDay); });
+  });
+
+  /* ---------- build ---------- */
+  var WHERE = {
+    promo: "a promo post for Skool promo groups, about 150 to 250 words, for " + (MEMBER ? "people" : "women in business") + " who don't know me yet",
+    community: "a post for my own Skool community, talking to my members like friends who already know me",
+    social: "a social media caption for Instagram and Facebook. End with 3 to 5 relevant hashtags"
+  };
+  function buildPrompt() {
+    var b = S.build, n = +b.versions || 1;
+    var about = (b.about || "").trim(), promo = (b.promo || "").trim(), link = (b.link || "").trim();
+    var s = "Write " + WHERE[b.where] + ", in my voice." + (MEMBER
+        ? "\n\nFirst, use what you already know about me from our past chats, your memory of me and any projects or files I've shared: my name, my business, who I help, how I talk, how I sign off and my brand colors. If you don't know enough to sound like me, ask me 2 or 3 quick questions first, all at once, and wait for my answers.\n\n"
+        : " I'm Aurailia Arnold.\n\n") +
+      "WHAT I WANT TO SAY (my own words, from a voice note)\n" + (about || "[say what the post is about]") + "\n\n" +
+      (promo ? "WHAT I'M PROMOTING: " + promo + "\n" : "") + (link ? "LINK: " + link + "\n" : "") + (promo || link ? "\n" : "") +
+      "MY VOICE\n" +
+      (MEMBER ? "- Write the way I talk, from what you know about me. Simple words, like I'm talking to a friend.\n" : "- Write like I talk: direct, grounded, warm and a little playful. Simple words, like I'm talking to a friend.\n") +
+      "- Short sentences. Contractions. Talk to the reader as \"you\". A check-in like \"Right?\" is welcome.\n" +
+      "- Keep my stories and my exact phrases where they work. Don't add stories or details I didn't give you.\n" +
+      "- Open with a question and answer it, or with a small real-life moment the reader lives. Connect first. Don't jump to the offer too soon.\n" +
+      "- The post picks up where the title leaves off. Don't repeat the title's moment in the first line.\n" +
+      (MEMBER ? "" : "- If it's about the Business Alignment Blueprint, keep Human Design at the center and tie it to everyday business struggles.\n") +
+      "- Don't assume the reader's clients or buyers are women.\n\n" +
+      "NEVER\n" +
+      "- Em dashes or en dashes. Use a period or a comma.\n" +
+      "- \"You're not X, you're Y\" or \"it's not X, it's Y\".\n" +
+      "- Lists of three just for rhythm, or announcing what you're about to say.\n" +
+      "- Coach jargon or AI phrases: high-vibe, aligned action, level up, scale, 7-figure, in today's world, let's dive in, here's the thing, the truth is, imagine, game-changer, unlock, elevate, journey, empower.\n" +
+      "- \"DM me\". The link goes right in the post.\n" +
+      "- Made-up results, prices, dates or testimonials. Leave a [bracket] for anything you don't know.\n\n" +
+      "FORMATTING\n" +
+      (b.where === "social" ? "- Plain text, short paragraphs with a blank line between them, emojis welcome.\n"
+        : "- This is for Skool, which doesn't show markdown. No asterisks or #. For bold, use real Unicode bold letters (like 𝗛𝗘𝗦) for section headers in caps, each starting with an emoji.\n- Lists start with ✦ or an emoji. Short paragraphs with a blank line between them.\n") +
+      "- Title: a hook under 70 characters that makes my reader stop scrolling.\n" +
+      "- End with one clear next step" + (link ? " and the link" : "") + (MEMBER ? ", then my usual sign-off (ask me if you don't know it).\n" : ", then my sign-off exactly like this: " + SIGNOFF + "\n") +
+      (n > 1 ? "- Give me " + n + " versions. Each one needs a different title and a different opening angle, so I can post them in different groups without repeating myself.\n" : "") +
+      (b.img ? "- After each version, give an image prompt I can paste into ChatGPT for a square 1:1 banner. Real-looking photography that fits the post, " + (MEMBER ? "in my brand colors and style (use what you know about my brand, or ask me)" : "in my brand colors: deep plum, warm gold and blush pink with a touch of teal") + ". Not too busy. Put the title on the image, spelled exactly" + (MEMBER ? "" : ", in an elegant serif with a script accent") + ". Start it by asking if I want to add a photo of myself.\n" : "") +
+      (b.sells ? playbookBlock() : "") +
+      "\nOUTPUT\nIf something important is missing, ask me 1 or 2 quick questions first. Then give me the post" + (n > 1 ? "s" : "") + " in exactly this format, with nothing else around it, so I can paste it into She Posts\u2122:\n\n";
+    for (var i = 1; i <= n; i++) s += (n > 1 ? "VERSION " + i + "\n" : "") + "TITLE: [the title]\nPOST:\n[the post]\n" + (b.img ? "IMAGE PROMPT: [the image prompt]\n" : "") + (i < n ? "\n" : "");
+    return s;
+  }
+  function playbookBlock() {
+    return "\nSHE SELLS™\nBlend one of these selling rules into the post in a sentence or two, in my voice. Pick the one that fits best. Don't add a section or header for it, and don't name the rule.\n\n" + PLAYBOOK + "\n";
+  }
+  function renderBuild() {
+    var b = S.build;
+    $("bAbout").value = b.about || ""; $("bPromo").value = b.promo || ""; $("bLink").value = b.link || "";
+    $("bSells").checked = !!b.sells; $("bImg").checked = !!b.img;
+    document.querySelectorAll("[data-where]").forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-where") === b.where); });
+    document.querySelectorAll("[data-v]").forEach(function (c) { c.classList.toggle("on", +c.getAttribute("data-v") === +b.versions); });
+    $("bDay").innerHTML = dayOptions(todayIdx());
+    $("bOut").textContent = buildPrompt();
+  }
+  function bSync() { $("bOut").textContent = buildPrompt(); save(); }
+  ["bAbout", "bPromo", "bLink"].forEach(function (id) {
+    $(id).addEventListener("input", function () { S.build[{ bAbout: "about", bPromo: "promo", bLink: "link" }[id]] = this.value; bSync(); });
+  });
+  $("bSells").addEventListener("change", function () { S.build.sells = this.checked; bSync(); });
+  $("bImg").addEventListener("change", function () { S.build.img = this.checked; bSync(); });
+  $("bWhere").addEventListener("click", function (e) { var c = e.target.closest("[data-where]"); if (!c) return; S.build.where = c.getAttribute("data-where"); renderBuild(); save(); });
+  $("bVers").addEventListener("click", function (e) { var c = e.target.closest("[data-v]"); if (!c) return; S.build.versions = +c.getAttribute("data-v"); renderBuild(); save(); });
+  $("bCopy").addEventListener("click", function () { copy(buildPrompt(), "Prompt copied. Paste it into Claude."); });
+  $("bAdd").addEventListener("click", function () {
+    var d = +$("bDay").value, n = addPosts($("bBack").value, d);
+    if (n) { $("bBack").value = ""; S.build.about = ""; save(); toast("Added " + n + (n === 1 ? " post" : " posts") + " to " + DAYS[d]); go(slug(d)); }
+  });
+
+  /* voice */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, live = false, base = "";
+  $("speakBtn").addEventListener("click", function () {
+    var btn = this;
+    if (!SR) { $("speakNote").textContent = "Speaking isn't available in this browser. Tap the microphone on your keyboard instead."; $("bAbout").focus(); return; }
+    if (live && rec) { rec.stop(); return; }
+    try {
+      rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+      base = $("bAbout").value ? $("bAbout").value.replace(/\s*$/, " ") : "";
+      rec.onresult = function (ev) {
+        var fin = "", tmp = "";
+        for (var i = 0; i < ev.results.length; i++) { if (ev.results[i].isFinal) fin += ev.results[i][0].transcript; else tmp += ev.results[i][0].transcript; }
+        $("bAbout").value = base + fin + tmp; S.build.about = base + fin; bSync();
+      };
+      rec.onend = function () { live = false; btn.classList.remove("live"); btn.innerHTML = "&#127908; Speak"; S.build.about = $("bAbout").value; bSync(); };
+      rec.onerror = function () { $("speakNote").textContent = "The microphone isn't available here. Tap the microphone on your keyboard instead."; };
+      rec.start(); live = true; btn.classList.add("live"); btn.innerHTML = "&#9632; Stop";
+    } catch (e) { $("speakNote").textContent = "The microphone isn't available here. Tap the microphone on your keyboard instead."; }
+  });
+
+  /* ---------- groups ---------- */
+  function renderGroups() {
+    $("gList").innerHTML = S.groups.length ? S.groups.map(function (g) {
+      var days = gDays(g);
+      return '<div class="gcard" data-g="' + g.id + '"><div class="grow">' +
+        '<input type="text" aria-label="Group name" data-f="name" value="' + esc(g.name) + '" placeholder="Group name">' +
+        '<input class="glink" type="url" aria-label="Group link" data-f="link" value="' + esc(g.link) + '" placeholder="https://www.skool.com/...">' +
+        '<button class="btn small danger" type="button" data-gdel>Remove</button></div>' +
+        '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
+        DAYS.map(function (d, i) { return '<button type="button" class="dchip' + (days.indexOf(i) !== -1 ? " on" : "") + '" data-gday="' + i + '" aria-pressed="' + (days.indexOf(i) !== -1) + '">' + d.slice(0, 3) + "</button>"; }).join("") +
+        "</div>" +
+        '<div class="gdays" role="group" aria-label="Posts a day"><span class="gdl">Posts a day</span>' +
+        [[1, "1"], [2, "2"], [0, "Unlimited"]].map(function (o) { return '<button type="button" class="dchip' + (gLimit(g) === o[0] ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + (gLimit(g) === o[0]) + '">' + o[1] + "</button>"; }).join("") +
+        "</div></div>";
+    }).join("") : '<p class="hint">No groups yet. Add the communities you promote in.</p>';
+  }
+  $("gList").addEventListener("input", function (e) {
+    var row = e.target.closest("[data-g]"); if (!row) return;
+    var g = S.groups.find(function (x) { return x.id === row.getAttribute("data-g"); });
+    g[e.target.getAttribute("data-f")] = e.target.value.trim(); save();
+  });
+  $("gList").addEventListener("click", function (e) {
+    var lc = e.target.closest("[data-glim]");
+    if (lc) {
+      var gl = S.groups.find(function (x) { return x.id === lc.closest("[data-g]").getAttribute("data-g"); });
+      gl.limit = +lc.getAttribute("data-glim"); save(); renderGroups(); return;
+    }
+    var dc = e.target.closest("[data-gday]");
+    if (dc) {
+      var gg = S.groups.find(function (x) { return x.id === dc.closest("[data-g]").getAttribute("data-g"); });
+      var di = +dc.getAttribute("data-gday"), ds = gDays(gg).slice(), at = ds.indexOf(di);
+      if (at === -1) ds.push(di); else ds.splice(at, 1);
+      gg.days = ds.sort(); save(); renderGroups(); return;
+    }
+    var b = e.target.closest("[data-gdel]"); if (!b) return;
+    var id = b.closest("[data-g]").getAttribute("data-g");
+    arm(b, "Remove", "Tap again", function () { S.groups = S.groups.filter(function (x) { return x.id !== id; }); save(); renderGroups(); });
+  });
+  $("gAdd").addEventListener("click", function () {
+    S.groups.push({ id: uid(), name: "", link: "", days: [0, 1, 2, 3, 4, 5, 6], limit: 1 }); save(); renderGroups();
+    var ins = $("gList").querySelectorAll('[data-f="name"]'); ins[ins.length - 1].focus();
+  });
+
+  load();
+  route();
+})();
+</script>
+</body>
+</html>
