@@ -83,7 +83,7 @@
   .day .dname { font-family: var(--font-display); font-size: 32px; font-weight: 600; line-height: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; }
   .day .count { font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
   .day .count.has { color: var(--teal); }
-  .thumb { width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; object-fit: cover; background: var(--surface-2); display: block; max-width: 100%; }
+  .thumb { width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; object-fit: contain; background: var(--surface-2); display: block; max-width: 100%; }
   .thumb.empty { display: grid; place-items: center; color: var(--faint); font-size: 15px; border: 1px dashed var(--line-strong); }
   .day .ttl { font-size: 17px; font-weight: 600; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.9em; }
   .day.today { border-color: var(--gold); }
@@ -135,10 +135,15 @@
   .skool input.stitle:hover, .skool textarea.sbody:hover { border-color: var(--skool-line); }
   .skool input.stitle:focus, .skool textarea.sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
   .skool .simg { margin-top: 12px; border-radius: 10px; overflow: hidden; border: 1px solid var(--skool-line); }
-  .skool .simg img { display: block; width: 100%; max-width: 100%; }
+  .skool .simg { aspect-ratio: 1 / 1; max-width: 100%; background: #f4f1f3; }
+  .skool .simg img { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
   .skool .noimg { margin-top: 12px; border: 1.5px dashed #cfc8d0; border-radius: 10px; padding: 22px; text-align: center; color: var(--skool-muted); font-size: 14px; cursor: pointer; background: #faf7f9; }
   .skool .noimg:hover { border-color: var(--gold); }
   .skool .foot { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--skool-line); color: var(--skool-muted); font-size: 13px; }
+  .fmt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--skool-line); }
+  .fbtn { font: inherit; font-size: 16px; min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--skool-line); background: #faf7f9; color: var(--skool-fg); cursor: pointer; }
+  .fbtn:hover { border-color: var(--gold); }
+  .fhint { font-size: 13px; color: var(--skool-muted); margin-left: 4px; }
   .edit-tip { font-size: 12.5px; color: var(--faint); margin: 8px 2px 0; }
 
   .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -650,6 +655,7 @@
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
         '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
+        '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><span class="fhint">Select words, then tap a style</span></div>' +
         '<label class="sr" for="sTitle">Title</label><input class="stitle" id="sTitle" type="text" value="' + esc(cur.title) + '" placeholder="Add a title">' +
         '<label class="sr" for="sBody">Post</label><textarea class="sbody" id="sBody" placeholder="Write your post">' + esc(cur.body) + "</textarea>" +
         (imgSrc(cur) ? '<div class="simg"><img alt="Post image" src="' + esc(imgSrc(cur)) + '"></div>' : '<div class="noimg" data-act="img" role="button" tabindex="0">&#128247; Add an image</div>') +
@@ -678,6 +684,45 @@
       "</div></div>";
     grow($("sBody"));
   }
+  /* ---------- bold and italic with Unicode letters, so they paste into Skool ---------- */
+  var STY = { bold: [0x1D5D4, 0x1D5EE, 0x1D7EC], italic: [0x1D608, 0x1D622, null], bolditalic: [0x1D63C, 0x1D656, null] };
+  function toPlain(s) {
+    return Array.from(s).map(function (ch) {
+      var o = ch.codePointAt(0);
+      for (var k in STY) {
+        var r = STY[k];
+        if (o >= r[0] && o < r[0] + 26) return String.fromCharCode(65 + o - r[0]);
+        if (o >= r[1] && o < r[1] + 26) return String.fromCharCode(97 + o - r[1]);
+        if (r[2] && o >= r[2] && o < r[2] + 10) return String.fromCharCode(48 + o - r[2]);
+      }
+      return ch;
+    }).join("");
+  }
+  function styled(s, kind) {
+    var r = STY[kind];
+    return Array.from(toPlain(s)).map(function (ch) {
+      var o = ch.charCodeAt(0);
+      if (o >= 65 && o <= 90) return String.fromCodePoint(r[0] + o - 65);
+      if (o >= 97 && o <= 122) return String.fromCodePoint(r[1] + o - 97);
+      if (r[2] && o >= 48 && o <= 57) return String.fromCodePoint(r[2] + o - 48);
+      return ch;
+    }).join("");
+  }
+  var lastField = null, lastSel = [0, 0];
+  document.addEventListener("selectionchange", function () {
+    var a = document.activeElement;
+    if (a && (a.id === "sTitle" || a.id === "sBody")) { lastField = a.id; lastSel = [a.selectionStart, a.selectionEnd]; }
+  });
+  function applyFmt(kind) {
+    var el = lastField && $(lastField);
+    if (!el || lastSel[0] === lastSel[1]) { toast("Select some words first"); return; }
+    var v = el.value, a = lastSel[0], b = lastSel[1], part = v.slice(a, b);
+    var out = kind === "plain" ? toPlain(part) : (styled(part, kind) === part ? toPlain(part) : styled(part, kind));
+    el.value = v.slice(0, a) + out + v.slice(b);
+    el.focus(); try { el.setSelectionRange(a, a + out.length); } catch (e) {}
+    lastSel = [a, a + out.length];
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
   function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
   $("dayBody").addEventListener("input", function (e) {
     var p = curP(); if (!p) return;
@@ -689,7 +734,11 @@
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
   });
   $("dayBody").addEventListener("keydown", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
+  $("dayBody").addEventListener("mousedown", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); });
+  $("dayBody").addEventListener("touchstart", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); }, { passive: false });
+  $("dayBody").addEventListener("touchend", function (e) { var f = e.target.closest("[data-fmt]"); if (f) { e.preventDefault(); applyFmt(f.getAttribute("data-fmt")); } });
   $("dayBody").addEventListener("click", function (e) {
+    var fm = e.target.closest("[data-fmt]"); if (fm) { applyFmt(fm.getAttribute("data-fmt")); return; }
     var t = e.target.closest("[data-post]"); if (t) { curPost[curDay] = t.getAttribute("data-post"); renderDay(curDay); return; }
     var k = e.target.closest("[data-tick]");
     if (k) { var p0 = curP(), gid = k.getAttribute("data-tick"); p0.posted[gid] = !p0.posted[gid]; save(); renderDay(curDay); return; }
