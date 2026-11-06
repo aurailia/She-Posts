@@ -635,7 +635,11 @@
     arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); renderWeek(); toast("Your week is clear"); });
   });
 
-  function grow(el) { el.style.height = "auto"; el.style.height = (el.scrollHeight + 4) + "px"; }
+  /* fit the box to the text. While typing it only grows, so the page never jumps. */
+  function grow(el, full) {
+    if (full) { el.style.height = "auto"; el.style.height = (el.scrollHeight + 4) + "px"; return; }
+    if (el.scrollHeight > el.clientHeight) el.style.height = (el.scrollHeight + 4) + "px";
+  }
 
   function renderDay(d) {
     $("dayTitle").textContent = DAYS[d];
@@ -682,7 +686,7 @@
         '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
           '<div class="row"><button class="btn small danger" type="button" data-act="delete">Delete this post</button></div></div>' +
       "</div></div>";
-    grow($("sBody"));
+    grow($("sBody"), true);
   }
   /* ---------- bold and italic with Unicode letters, so they paste into Skool ---------- */
   var STY = { bold: [0x1D5D4, 0x1D5EE, 0x1D7EC], italic: [0x1D608, 0x1D622, null], bolditalic: [0x1D63C, 0x1D656, null] };
