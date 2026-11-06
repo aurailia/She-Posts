@@ -143,6 +143,8 @@
   .fmt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--skool-line); }
   .fbtn { font: inherit; font-size: 16px; min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--skool-line); background: #faf7f9; color: var(--skool-fg); cursor: pointer; }
   .fbtn:hover { border-color: var(--gold); }
+  .linkbar { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 12px; }
+  .linkbar input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 15px; color: var(--skool-fg); background: #fff; border: 1px solid var(--skool-line); border-radius: 8px; padding: 7px 10px; }
   .fhint { font-size: 13px; color: var(--skool-muted); margin-left: 4px; }
   .edit-tip { font-size: 12.5px; color: var(--faint); margin: 8px 2px 0; }
 
@@ -659,12 +661,13 @@
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
         '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
-        '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><span class="fhint">Select words, then tap a style</span></div>' +
+        '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><button type="button" class="fbtn" data-fmt="link" title="Add a link">&#128279; Link</button><span class="fhint">Select words, then tap a style</span></div>' +
+        '<div class="linkbar" id="linkBar" hidden><label for="linkUrl" class="sr">Link address</label><input id="linkUrl" type="url" placeholder="Paste the link, like https://www.skool.com/..."><button type="button" class="fbtn" data-act="link-add">Add link</button><button type="button" class="fbtn" data-act="link-cancel">Cancel</button></div>' +
         '<label class="sr" for="sTitle">Title</label><input class="stitle" id="sTitle" type="text" value="' + esc(cur.title) + '" placeholder="Add a title">' +
         '<label class="sr" for="sBody">Post</label><textarea class="sbody" id="sBody" placeholder="Write your post">' + esc(cur.body) + "</textarea>" +
         (imgSrc(cur) ? '<div class="simg"><img alt="Post image" src="' + esc(imgSrc(cur)) + '"></div>' : '<div class="noimg" data-act="img" role="button" tabindex="0">&#128247; Add an image</div>') +
         '<div class="foot"><span>&#128077; Like</span><span>&#128172; Comment</span></div></div>' +
-        '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type.</p>' +
+        '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type. Links show as [words](link) here and become real links when you copy the post.</p>' +
       '</div><div class="side">' +
         '<div class="panel"><span class="label">Copy</span><div class="row">' +
           '<button class="btn primary small" type="button" data-act="copy-title">Copy title</button>' +
@@ -717,8 +720,13 @@
     var a = document.activeElement;
     if (a && (a.id === "sTitle" || a.id === "sBody")) { lastField = a.id; lastSel = [a.selectionStart, a.selectionEnd]; }
   });
+  var linkSel = null;
   function applyFmt(kind) {
     var el = lastField && $(lastField);
+    if (kind === "link") {
+      if (lastField !== "sBody" || lastSel[0] === lastSel[1]) { toast("Select some words in the post first"); return; }
+      linkSel = [lastSel[0], lastSel[1]]; $("linkBar").hidden = false; $("linkUrl").value = ""; $("linkUrl").focus(); return;
+    }
     if (!el || lastSel[0] === lastSel[1]) { toast("Select some words first"); return; }
     var v = el.value, a = lastSel[0], b = lastSel[1], part = v.slice(a, b);
     var out = kind === "plain" ? toPlain(part) : (styled(part, kind) === part ? toPlain(part) : styled(part, kind));
@@ -726,6 +734,25 @@
     el.focus(); try { el.setSelectionRange(a, a + out.length); } catch (e) {}
     lastSel = [a, a + out.length];
     el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  /* links are kept as [words](link). Copy post sends a real link where the app accepts it, and words plus link everywhere else */
+  var LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+  function plainPost(s) { return s.replace(LINK_RE, function (m, w, u) { return w + " " + u; }); }
+  function htmlPost(s) {
+    return esc(s).replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, function (m, w, u) { return '<a href="' + u + '">' + w + "</a>"; }).split("\n").map(function (l) { return l ? "<p>" + l + "</p>" : "<p><br></p>"; }).join("");
+  }
+  function copyPost(body) {
+    var plain = plainPost(body);
+    if (!LINK_RE.test(body)) { LINK_RE.lastIndex = 0; copy(body, "Post copied", $("sBody")); return; }
+    LINK_RE.lastIndex = 0;
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([plain], { type: "text/plain" }), "text/html": new Blob([htmlPost(body)], { type: "text/html" }) })])
+          .then(function () { toast("Post copied with your links"); }, function () { copy(plain, "Post copied", $("sBody")); });
+        return;
+      }
+    } catch (e) {}
+    copy(plain, "Post copied", $("sBody"));
   }
   function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
   $("dayBody").addEventListener("input", function (e) {
@@ -752,7 +779,16 @@
     if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay); if (n) { toast("Added " + n + (n === 1 ? " post" : " posts")); curPost[curDay] = S.posts[S.posts.length - n].id; renderDay(curDay); } }
     if (!p) return;
     if (act === "copy-title") copy(p.title, "Title copied", $("sTitle"));
-    if (act === "copy-body") copy(p.body, "Post copied", $("sBody"));
+    if (act === "copy-body") copyPost(p.body);
+    if (act === "link-cancel") { $("linkBar").hidden = true; linkSel = null; }
+    if (act === "link-add") {
+      var url = $("linkUrl").value.trim();
+      if (!/^https?:\/\//i.test(url)) { if (/^[\w-]+\.[\w.-]+/.test(url)) url = "https://" + url; else { toast("Paste a full link, starting with https://"); return; } }
+      var el = $("sBody"), v = el.value, a = linkSel[0], b = linkSel[1], words = v.slice(a, b).replace(/[\[\]]/g, "");
+      var md = "[" + words + "](" + url + ")";
+      el.value = v.slice(0, a) + md + v.slice(b); $("linkBar").hidden = true; linkSel = null;
+      el.dispatchEvent(new Event("input", { bubbles: true })); toast("Link added");
+    }
     if (act === "copy-img") copy(p.imgPrompt, "Image prompt copied");
     if (act === "img") { pickFor = p.id; picker.click(); }
     if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
