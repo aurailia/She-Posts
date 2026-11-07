@@ -126,14 +126,15 @@
   .skool .av { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--blush)); display: grid; place-items: center; color: var(--on-gold); font-weight: 700; font-size: 15px; }
   .skool .nm { font-weight: 600; font-size: 15px; line-height: 1.2; }
   .skool .meta { font-size: 13px; color: var(--skool-muted); }
-  .skool input.stitle {
+  .skool textarea.stitle { resize: none; overflow: hidden; min-height: 0; display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .skool .stitle {
     width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-weight: 700; font-size: 22px; line-height: 1.3; padding: 4px 6px; margin: 0 -6px 4px; border-radius: 8px;
   }
   .skool textarea.sbody {
     width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-size: 17px; line-height: 1.6; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; resize: none; overflow: hidden; min-height: 80px;
   }
-  .skool input.stitle:hover, .skool textarea.sbody:hover { border-color: var(--skool-line); }
-  .skool input.stitle:focus, .skool textarea.sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
+  .skool .stitle:hover, .skool textarea.sbody:hover { border-color: var(--skool-line); }
+  .skool .stitle:focus, .skool textarea.sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
   .skool .simg { margin-top: 12px; border-radius: 10px; overflow: hidden; border: 1px solid var(--skool-line); }
   .skool .simg { aspect-ratio: 1 / 1; max-width: 100%; background: #f4f1f3; }
   .skool .simg img { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
@@ -937,7 +938,7 @@
         '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
         '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><button type="button" class="fbtn" data-fmt="link" title="Add a link">&#128279; Link</button><span class="fhint">Select words, then tap a style</span></div>' +
         '<div class="linkbar" id="linkBar" hidden><label for="linkUrl" class="sr">Link address</label><input id="linkUrl" type="url" placeholder="Paste the link, like https://www.skool.com/..."><button type="button" class="fbtn" data-act="link-add">Add link</button><button type="button" class="fbtn" data-act="link-cancel">Cancel</button></div>' +
-        '<label class="sr" for="sTitle">Title</label><input class="stitle" id="sTitle" type="text" value="' + esc(cur.title) + '" placeholder="Add a title">' +
+        '<label class="sr" for="sTitle">Title</label><textarea class="stitle" id="sTitle" rows="1" placeholder="Add a title">' + esc(cur.title) + '</textarea>' +
         '<label class="sr" for="sBody">Post</label><textarea class="sbody" id="sBody" placeholder="Write your post">' + esc(cur.body) + "</textarea>" +
         (imgSrc(cur) ? '<div class="simg"><img alt="Post image" src="' + esc(imgSrc(cur)) + '"></div>' : '<div class="noimg" data-act="img" role="button" tabindex="0">&#128247; Add an image</div>') +
         '<div class="foot"><span>&#128077; Like</span><span>&#128172; Comment</span></div></div>' +
@@ -968,7 +969,7 @@
         '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
           '<div class="row"><button class="btn small danger" type="button" data-act="delete">Delete this post</button></div></div>' +
       "</div></div>";
-    grow($("sBody"), true);
+    grow($("sTitle"), true); grow($("sBody"), true);
   }
   /* ---------- bold and italic with Unicode letters, so they paste into Skool ---------- */
   var STY = { bold: [0x1D5D4, 0x1D5EE, 0x1D7EC], italic: [0x1D608, 0x1D622, null], bolditalic: [0x1D63C, 0x1D656, null] };
@@ -1066,7 +1067,7 @@
   function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
   $("dayBody").addEventListener("input", function (e) {
     var p = curP(); if (!p) return;
-    if (e.target.id === "sTitle") { p.title = e.target.value; var f1 = favOf(p); if (f1) f1.title = p.title; save(); }
+    if (e.target.id === "sTitle") { if (/\n/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*\n+\s*/g, " "); grow(e.target, true); p.title = e.target.value; var f1 = favOf(p); if (f1) f1.title = p.title; save(); }
     if (e.target.id === "sBody") { p.body = e.target.value; var f2 = favOf(p); if (f2) f2.body = p.body; grow(e.target); save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
@@ -1075,7 +1076,7 @@
     if (e.target.id !== "moveDay") return;
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
   });
-  $("dayBody").addEventListener("keydown", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
+  $("dayBody").addEventListener("keydown", function (e) { if (e.target.id === "sTitle" && e.key === "Enter") { e.preventDefault(); return; } if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
   $("dayBody").addEventListener("mousedown", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); });
   $("dayBody").addEventListener("touchstart", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); }, { passive: false });
   $("dayBody").addEventListener("touchend", function (e) { var f = e.target.closest("[data-fmt]"); if (f) { e.preventDefault(); applyFmt(f.getAttribute("data-fmt")); } });
