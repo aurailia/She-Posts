@@ -208,6 +208,8 @@
         <button class="btn" type="button" id="openAdd">&#10133; Paste a post</button>
       </div>
       <div class="row">
+        <button class="btn small" type="button" id="fileSave">&#128190; Save to a file</button>
+        <button class="btn small" type="button" id="fileOpen">&#128194; Open a file</button>
         <button class="btn small" type="button" id="moveOpen">&#128228; Move my week</button>
         <button class="btn small" type="button" id="pasteOpen">&#128229; Paste my week</button>
         <button class="btn small danger" type="button" id="clearWeek">Clear the week</button>
@@ -215,9 +217,14 @@
     </div>
     <div class="panel" id="movePanel" hidden style="margin-bottom:16px">
       <h2>Move my week to another device</h2>
-      <p class="hint" style="margin:0">Send this link to yourself (text, email or AirDrop) and open it on your other phone or computer. Your posts, titles and groups come with it. Images stay on this device, so add them where you post from.</p>
+      <p class="hint" style="margin:0">Send this link to yourself (text, email or AirDrop) and open it on your other phone or computer. Your posts, titles and groups come with it. Images stay on this device. To bring images too, use Save to a file.</p>
       <div class="out" id="moveOut" style="max-height:110px;overflow-wrap:anywhere"></div>
       <div class="row"><button class="btn primary" type="button" id="moveCopy">Copy the link</button><button class="btn" type="button" id="moveClose">Done</button></div>
+    </div>
+    <div class="panel" id="filePanel" hidden style="margin-bottom:16px">
+      <h2>Open your saved week</h2>
+      <p class="hint" style="margin:0" id="fileInfo"></p>
+      <div class="row"><button class="btn primary" type="button" id="fileGo">Replace my week</button><button class="btn" type="button" id="fileCancel">Cancel</button></div>
     </div>
     <div class="panel" id="pastePanel" hidden style="margin-bottom:16px">
       <h2>Paste my week</h2>
@@ -686,6 +693,46 @@
   $("moveClose").addEventListener("click", function () { $("movePanel").hidden = true; });
   $("pasteOpen").addEventListener("click", function () { $("movePanel").hidden = true; $("pastePanel").hidden = false; $("pasteText").focus(); });
   $("pasteClose").addEventListener("click", function () { $("pastePanel").hidden = true; });
+
+  /* ---------- save to a file / open a file (images included) ---------- */
+  function stamp() { var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  $("fileSave").addEventListener("click", function () {
+    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts, groups: S.groups, build: S.build, show: S.show || "all" };
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = "she-posts-" + stamp() + ".json"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast("Saved. Look in your Downloads.");
+  });
+  var filePick = document.createElement("input"); filePick.type = "file"; filePick.hidden = true; document.body.appendChild(filePick);
+  var pending = null;
+  $("fileOpen").addEventListener("click", function () { filePick.value = ""; filePick.click(); });
+  filePick.addEventListener("change", function () {
+    var file = filePick.files && filePick.files[0]; if (!file) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var data = null; try { data = JSON.parse(r.result); } catch (e) {}
+      if (!data || data.app !== "she-posts" || !Array.isArray(data.posts)) { toast("That isn't a She Posts file. Pick the one you saved."); return; }
+      pending = data;
+      var n = data.posts.length, when = data.savedAt ? new Date(data.savedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+      $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". This replaces everything on this device, images and groups included.";
+      $("movePanel").hidden = true; $("pastePanel").hidden = true; $("filePanel").hidden = false;
+    };
+    r.onerror = function () { toast("Couldn't open that file. Try again."); };
+    r.readAsText(file);
+  });
+  $("fileCancel").addEventListener("click", function () { pending = null; $("filePanel").hidden = true; });
+  $("fileGo").addEventListener("click", function () {
+    var btn = this;
+    arm(btn, "Replace my week", "Tap again to replace", function () {
+      if (!pending) return;
+      var before = JSON.stringify(S);
+      S.posts = pending.posts.map(function (p) { return Object.assign({ img: "", imgPrompt: "", posted: {} }, p); });
+      S.groups = pending.groups || S.groups; S.build = Object.assign({}, SEED.build, pending.build || {}); S.show = pending.show || "all";
+      if (!save()) { S = JSON.parse(before); toast("This device ran out of room for all the images. Remove a few images and save the file again."); return; }
+      pending = null; $("filePanel").hidden = true; renderWeek(); toast("Your week is here");
+    });
+  });
   $("pasteGo").addEventListener("click", function () {
     var btn = this;
     arm(btn, "Replace my week", "Tap again to replace", function () {
