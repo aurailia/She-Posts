@@ -1124,7 +1124,7 @@
       "- Title: a hook under 70 characters that makes my reader stop scrolling.\n" +
       "- End with one clear next step" + (link ? " and the link" : "") + (MEMBER ? ", then my usual sign-off (ask me if you don't know it).\n" : ", then my sign-off exactly like this: " + SIGNOFF + "\n") +
       (n > 1 ? "- Give me " + n + " versions. Each one needs a different title and a different opening angle, so I can post them in different groups without repeating myself.\n" : "") +
-      (b.img ? "- After each version, give an image prompt I can paste into ChatGPT for a square 1:1 banner. Real-looking photography that fits the post, " + (MEMBER ? "in my brand colors and style (use what you know about my brand, or ask me)" : "in my brand colors: deep plum, warm gold and blush pink with a touch of teal") + ". Not too busy. Put the title on the image, spelled exactly" + (MEMBER ? "" : ", in an elegant serif with a script accent") + ". Start it by asking if I want to add a photo of myself.\n" : "") +
+      (b.img ? "- After each version, write an image prompt I can paste into ChatGPT or Claude to make the banner. Use this exact template, filled in for that version:\n" + IMG_TEMPLATE + "\n" : "") +
       (b.style ? "\n" + STYLE + "\n\n" + shapeBlock(b.shape) + "\n" : "") +
       (b.sells ? playbookBlock() : "") +
       "\nOUTPUT\nIf something important is missing, ask me 1 or 2 quick questions first. Then give me the post" + (n > 1 ? "s" : "") + " in exactly this format, with nothing else around it, so I can paste it into She Posts\u2122:\n\n";
@@ -1138,6 +1138,7 @@
     if (SHAPES[k]) return "POST SHAPE (use this one)\n" + SHAPES[k];
     return "POST SHAPE\nPick the one that fits best:\n" + Object.keys(SHAPES).map(function (x) { return "- " + SHAPES[x]; }).join("\n");
   }
+  var IMG_TEMPLATE = "Create a square 1:1 banner for a community post. It should look like it belongs with my other graphics.\n\nMATCH MY BRAND\n- Look at the banners and graphics you've made for me before, in this chat, this project or your memory of me, and match that style: my colors, fonts, decorative details, textures and overall feel.\n- If you haven't made graphics for me before, ask me to upload 2 or 3 of my banners, or tell you my brand colors and fonts, before you create it. Don't guess.\n- If my banners usually include a photo of me, ask if I want to be in this one too.\n\nTHE BANNER\n- Text on the image, spelled exactly: \"[the post title]\"\n- What it shows: [one or two lines on a scene or objects that fit this post]\n- Keep it clean and easy to read on a phone. Not too busy.";
   function playbookBlock() {
     return "\nSHE SELLS™\nBlend one of these selling rules into the post in a sentence or two, in my voice. Pick the one that fits best. Don't add a section or header for it, and don't name the rule.\n\n" + PLAYBOOK + "\n";
   }
