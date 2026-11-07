@@ -172,6 +172,9 @@
   .vtag.me { background: var(--teal); color: #0d2a26; border-color: var(--teal); }
   .ptab .pf { display: block; font-size: 12px; font-weight: 600; opacity: .8; margin-top: 1px; }
   .fors { display: block; font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .showbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
+  .showbar .label { margin: 0; }
+  .showbar select { width: auto; min-width: 220px; max-width: 100%; }
   .mine-note { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
   .ptab .pn { font-size: 12px; font-weight: 700; opacity: .85; margin-left: 4px; }
   .tick.full { opacity: .5; cursor: not-allowed; }
@@ -235,6 +238,7 @@
         <button class="btn" type="button" id="addCancel">Cancel</button>
       </div>
     </div>
+    <div class="showbar" data-showbar></div>
     <div class="week" id="weekGrid"></div>
   </section>
 
@@ -243,6 +247,7 @@
     <a class="back" href="#week">&larr; Back to the week</a>
     <nav class="daynav" id="dayNav" aria-label="Days"></nav>
     <h1 id="dayTitle">Monday</h1>
+    <div class="showbar" data-showbar></div>
     <div id="dayBody"></div>
   </section>
 
@@ -507,6 +512,23 @@
   }
   function targetsFor(p, d) { var f = pFor(p); if (f === "social") return []; if (f === "promo") return groupsFor(d); return S.groups.filter(function (g) { return g.id === f; }); }
   function postsFor(d) { return S.posts.filter(function (p) { return p.day === d; }); }
+  function showing() { var f = S.show || "all"; if (f === "all" || f === "promo" || f === "social") return f; return S.groups.some(function (g) { return g.id === f && g.mine; }) ? f : "all"; }
+  function visible(p) { var f = showing(); return f === "all" || pFor(p) === f; }
+  function shownFor(d) { return postsFor(d).filter(visible); }
+  function showLabel(f) { return f === "all" ? "All posts" : f === "promo" ? "Promo posts" : forLabel(f); }
+  function newFor() { var f = showing(); return f === "all" ? "promo" : f; }
+  function renderShow() {
+    var f = showing(), m = mineGroups();
+    var html = '<label class="label">Showing</label><select data-show aria-label="Which posts to show"><option value="all"' + (f === "all" ? " selected" : "") + ">All posts</option>" +
+      (m.length ? '<optgroup label="My communities">' + m.map(function (g) { return '<option value="' + g.id + '"' + (f === g.id ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("") + "</optgroup>" : "") +
+      '<optgroup label="Other communities"><option value="promo"' + (f === "promo" ? " selected" : "") + '>Promo posts</option><option value="social"' + (f === "social" ? " selected" : "") + ">Social media</option></optgroup></select>";
+    document.querySelectorAll("[data-showbar]").forEach(function (el) { el.innerHTML = html; });
+  }
+  document.addEventListener("change", function (e) {
+    if (!e.target.matches || !e.target.matches("[data-show]")) return;
+    S.show = e.target.value; save();
+    if (!$("vDay").hidden) renderDay(curDay); else renderWeek();
+  });
   function todayIdx() { var d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
 
   /* ---------- parsing pasted posts ---------- */
@@ -623,7 +645,7 @@
   function renderWeek() {
     var t = todayIdx();
     $("weekGrid").innerHTML = DAYS.map(function (d, i) {
-      var ps = postsFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
+      var ps = shownFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
       return '<button class="day' + (i === t ? " today" : "") + '" type="button" data-day="' + i + '">' +
         '<span class="dname">' + d + '<span class="count' + (ps.length ? " has" : "") + '">' + (ps.length ? ps.length + (ps.length === 1 ? " post" : " posts") : "Nothing yet") + '</span></span>' +
         (withImg ? '<img class="thumb" alt="" src="' + esc(imgSrc(withImg)) + '">' : '<span class="thumb empty">' + (ps.length ? "No image yet" : "Tap to add") + '</span>') +
@@ -632,7 +654,8 @@
         '<span class="gcount">' + groupsFor(i).length + (groupsFor(i).length === 1 ? " group" : " groups") + " to post in</span></button>";
     }).join("");
     $("addDay").innerHTML = dayOptions(t);
-    $("addFor").innerHTML = forOptions("promo");
+    $("addFor").innerHTML = forOptions(newFor());
+    renderShow();
   }
   $("weekGrid").addEventListener("click", function (e) {
     var b = e.target.closest("[data-day]"); if (b) go(slug(+b.getAttribute("data-day")));
@@ -671,11 +694,12 @@
 
   function renderDay(d) {
     $("dayTitle").textContent = DAYS[d];
-    $("dayNav").innerHTML = DAYS.map(function (x, i) { var n = postsFor(i).length; return '<a href="#' + slug(i) + '" class="' + (i === d ? "on" : "") + '">' + x.slice(0, 3) + (n ? '<span class="n">' + n + "</span>" : "") + "</a>"; }).join("");
-    var ps = postsFor(d);
+    $("dayNav").innerHTML = DAYS.map(function (x, i) { var n = shownFor(i).length; return '<a href="#' + slug(i) + '" class="' + (i === d ? "on" : "") + '">' + x.slice(0, 3) + (n ? '<span class="n">' + n + "</span>" : "") + "</a>"; }).join("");
+    renderShow();
+    var ps = shownFor(d);
     if (!ps.length) {
-      $("dayBody").innerHTML = '<div class="empty-day"><p>No posts for ' + DAYS[d] + ' yet.</p><div class="row" style="justify-content:center"><a class="btn primary" href="#build">&#127908; Build a post</a><button class="btn" type="button" data-act="paste-here">&#10133; Paste a post</button></div></div>' +
-        '<div class="panel" id="dayAdd" hidden style="margin-top:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>';
+      $("dayBody").innerHTML = '<div class="empty-day"><p>' + (showing() === "all" ? "No posts for " + DAYS[d] + " yet." : "No " + (showing() === "promo" ? "promo posts" : showing() === "social" ? "social media posts" : esc(showLabel(showing())) + " posts") + " for " + DAYS[d] + " yet.") + '</p><div class="row" style="justify-content:center"><a class="btn primary" href="#build">&#127908; Build a post</a><button class="btn" type="button" data-act="paste-here">&#10133; Paste a post</button></div></div>' +
+        '<div class="panel" id="dayAdd" hidden style="margin-top:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>';
       return;
     }
     var cur = ps.find(function (p) { return p.id === curPost[d]; }) || ps[0]; curPost[d] = cur.id;
@@ -684,7 +708,7 @@
     $("dayBody").innerHTML =
       '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + '<span class="pf">' + esc(forLabel(pFor(p))) + "</span></button>"; }).join("") +
       '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
-      '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
+      '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
         '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
         '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><button type="button" class="fbtn" data-fmt="link" title="Add a link">&#128279; Link</button><span class="fhint">Select words, then tap a style</span></div>' +
@@ -821,7 +845,7 @@
     if (e.target.id === "sBody") { p.body = e.target.value; grow(e.target); save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
-    if (e.target.id === "pFor") { var pf = curP(); pf.for = e.target.value; save(); toast("Set to " + forLabel(pf.for)); renderDay(curDay); return; }
+    if (e.target.id === "pFor") { var pf = curP(); pf.for = e.target.value; save(); if (!visible(pf)) { delete curPost[curDay]; toast("Moved to " + showLabel(pf.for) + ". Switch Showing to see it."); } else toast("Set to " + forLabel(pf.for)); renderDay(curDay); return; }
     if (e.target.id !== "moveDay") return;
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
   });
@@ -837,7 +861,7 @@
     var a = e.target.closest("[data-act]"); if (!a) return;
     var act = a.getAttribute("data-act"), p = curP();
     if (act === "paste-here") { $("dayAdd").hidden = false; $("dayAddText").focus(); }
-    if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay, p ? pFor(p) : "promo"); if (n) { toast("Added " + n + (n === 1 ? " post" : " posts")); curPost[curDay] = S.posts[S.posts.length - n].id; renderDay(curDay); } }
+    if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay, $("dayAddFor").value); if (n) { var np = S.posts[S.posts.length - n]; curPost[curDay] = np.id; toast("Added " + n + (n === 1 ? " post" : " posts") + (visible(np) ? "" : " to " + showLabel(pFor(np)) + ". Switch Showing to see it.")); renderDay(curDay); } }
     if (!p) return;
     if (act === "copy-title") copy(p.title, "Title copied", $("sTitle"));
     if (act === "copy-body") copyPost(p.body);
