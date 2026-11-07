@@ -115,7 +115,7 @@
   .daynav a.on { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
   .daynav a .n { color: inherit; opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
   .ptabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-  .ptab { font: inherit; font-size: 16px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); cursor: pointer; }
+  .ptab { font: inherit; font-size: 16px; font-weight: 600; padding: 10px 26px; min-width: 112px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); cursor: pointer; }
   .ptab.on { background: var(--blush); color: var(--on-gold); border-color: var(--blush); }
   .daygrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
   @media (max-width: 760px) { .daygrid { grid-template-columns: minmax(0, 1fr); } }
@@ -300,6 +300,18 @@
           </div>
           <p class="hint">Different versions get different titles and openings, so you're not posting the same thing in every group.</p>
         </div>
+        <div class="field">
+          <span class="label">What kind of post?</span>
+          <div class="chips" id="bShape" role="group" aria-label="What kind of post">
+            <button class="chip" type="button" data-shape="auto">Let Claude pick</button>
+            <button class="chip" type="button" data-shape="tip">Tip, then invite</button>
+            <button class="chip" type="button" data-shape="peek">Come take a look</button>
+            <button class="chip" type="button" data-shape="spotlight">Spotlight one thing</button>
+            <button class="chip" type="button" data-shape="launch">Launch</button>
+          </div>
+          <p class="hint" id="bShapeHint"></p>
+        </div>
+        <label class="check"><input type="checkbox" id="bStyle"> Follow the She Promotes&trade; style guide</label>
         <label class="check"><input type="checkbox" id="bSells"> Weave in She Sells&trade;</label>
         <label class="check"><input type="checkbox" id="bImg"> Include an image prompt</label>
       </div>
@@ -396,7 +408,7 @@
       { id: "g2", name: "Promote Today", link: "" },
       { id: "g3", name: "The Promo Lounge", link: "" }
     ],
-    build: { about: "", promo: "", link: "", where: "promo", versions: 2, sells: true, img: true }
+    build: { about: "", promo: "", link: "", where: "promo", versions: 2, sells: true, img: true, style: true, shape: "auto" }
   };
   if (MEMBER) {
     SEED.posts = [{ id: "seed1", day: 0, title: "\uD83D\uDC4B Example: Who should we send your way?",
@@ -706,7 +718,7 @@
     var cf = pFor(cur), today = targetsFor(cur, d), off = cf === "promo" ? promoGroups().length - today.length : 0;
     var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
     $("dayBody").innerHTML =
-      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + '<span class="pf">' + esc(forLabel(pFor(p))) + "</span></button>"; }).join("") +
+      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + (showing() === "all" ? '<span class="pf">' + esc(forLabel(pFor(p))) + "</span>" : "") + "</button>"; }).join("") +
       '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
@@ -912,6 +924,8 @@
       "- Lists of three just for rhythm, or announcing what you're about to say.\n" +
       "- Coach jargon or AI phrases: high-vibe, aligned action, level up, scale, 7-figure, in today's world, let's dive in, here's the thing, the truth is, imagine, game-changer, unlock, elevate, journey, empower.\n" +
       "- \"DM me\". The link goes right in the post.\n" +
+      "- Contrast lines like \"It's not about X. It's about Y\" or \"You don't need X. You need Y.\" Say the point straight.\n" +
+      "- The \"No X. No Y. No Z.\" triple. Answer the one objection that matters most instead.\n" +
       "- Made-up results, prices, dates or testimonials. Leave a [bracket] for anything you don't know.\n\n" +
       "FORMATTING\n" +
       (b.where === "social" ? "- Plain text, short paragraphs with a blank line between them, emojis welcome.\n"
@@ -920,10 +934,18 @@
       "- End with one clear next step" + (link ? " and the link" : "") + (MEMBER ? ", then my usual sign-off (ask me if you don't know it).\n" : ", then my sign-off exactly like this: " + SIGNOFF + "\n") +
       (n > 1 ? "- Give me " + n + " versions. Each one needs a different title and a different opening angle, so I can post them in different groups without repeating myself.\n" : "") +
       (b.img ? "- After each version, give an image prompt I can paste into ChatGPT for a square 1:1 banner. Real-looking photography that fits the post, " + (MEMBER ? "in my brand colors and style (use what you know about my brand, or ask me)" : "in my brand colors: deep plum, warm gold and blush pink with a touch of teal") + ". Not too busy. Put the title on the image, spelled exactly" + (MEMBER ? "" : ", in an elegant serif with a script accent") + ". Start it by asking if I want to add a photo of myself.\n" : "") +
+      (b.style ? "\n" + STYLE + "\n\n" + shapeBlock(b.shape) + "\n" : "") +
       (b.sells ? playbookBlock() : "") +
       "\nOUTPUT\nIf something important is missing, ask me 1 or 2 quick questions first. Then give me the post" + (n > 1 ? "s" : "") + " in exactly this format, with nothing else around it, so I can paste it into She Posts\u2122:\n\n";
     for (var i = 1; i <= n; i++) s += (n > 1 ? "VERSION " + i + "\n" : "") + "TITLE: [the title]\nPOST:\n[the post]\n" + (b.img ? "IMAGE PROMPT: [the image prompt]\n" : "") + (i < n ? "\n" : "");
     return s;
+  }
+  var STYLE = "STYLE GUIDE (follow it for every version)\nIf you can see a style guide or saved example posts of mine (in a project or files I've shared), read them first and follow them too. Where they're more specific, they win. Never copy wording from the examples, only how they work.\n\nTone: witty, fun and a little playful, and it always teaches something real. It sounds like me talking to a friend over coffee. The humor comes from how true it is, like \"You've joined 14 promo groups and posted in two. I see you.\" Laugh with the reader, never at them. Every post leaves them with something they can use today. If a line could sit in anyone else's post, rewrite it until it sounds like me.\n\nWhat makes people read and buy (use the pattern, never name it):\n- Name the exact frustration they feel right now, in the words they'd use.\n- Show why it matters. Right after the hook, help them feel what's at stake with a real moment they'd recognize, not a lecture. (For a post about engagement: when nobody comments, new members decide the room is empty and quietly leave.)\n- Name the cost of leaving it as it is: hours, money, clients who never found them, the energy of posting into silence. One or two honest lines. No fear, no guilt. The cost makes them care, and the tip that follows gives relief.\n- Confess you've done it too, then a short reaction on its own line.\n- Real numbers feel true (\"rewrote it 5 times\", \"45 minutes\"). Vague words feel like marketing.\n- List real moments they'd use it, each with a matching emoji, so every reader finds themselves in one line.\n- Bust a belief they hold to stop the scroll, then give them relief.\n- Give a real tip before the pitch.\n- Make the win tiny and doable today.\n- Show how easy it is in short steps.\n- Answer the one objection that matters most before they think it.\n- Share a little of yourself: a laugh at yourself, or \"I wish I'd had this when I started.\"\n- If it's still growing, say so. It feels honest and invites them in early.\n- Lead with FREE when it's free.\n- For a deal: the regular price next to the deal price, the reason for the deal, and the fine print in one plain line. Only use prices, dates and codes I gave you.\n- Show exactly what they get in a short list.\n- If one thing is only in a paid tier, say it once with a \ud83d\udd12, no pressure.\n- One clear next step. One link.\n- Invite them to come back and share how it went.\n\nThe shape:\n- Hook: a question that names a specific frustration, a funny confession, a belief buster, or the offer name in caps as a bold headline with the hook right under it. CAPS on one or two words for punch, never more. A knowing emoji like \ud83d\ude02 is welcome.\n- Why it matters and the cost, in a few short lines.\n- Value: one tip or bit of selling psychology, then a \"Try this today\" quick win. Bold the one phrase that lands the insight.\n- Bridge to the offer by name, in Unicode bold.\n- A short list of what's inside, with one emoji as the bullet.\n- Close: a bold line that says the real problem in a new way, a bold invitation (lead with FREE if it's free), then \ud83d\udc49 and the link.\n- Very short lines and lots of white space for people skimming. Pick one signature emoji and repeat it through the post as a thread.\n- Write fresh. Never copy wording from any post you've seen.";
+  var SHAPES = {"tip": "TIP, THEN INVITE: hook, why it matters and the cost, a 💡 bit of selling psychology, a Try this today quick win, bridge to my offer, what they get (one emoji per tier if there are tiers), a bold reframe of the problem, the invitation, 👉 link.", "peek": "COME TAKE A LOOK: a casual, funny hook, a line on why it matters, an invitation to take a look (or another look) at a resource, an Inside you'll find list, FREE called out if it's free, a personal line about why it exists and that it's still growing, a line for both new and returning readers, then a warm one-line close.", "spotlight": "SPOTLIGHT ONE THING: a belief-busting hook, why it matters and the cost, a quick tip, then make one tool or benefit the star. One line on what it is and who it's for, a ✓ checklist where each item is a bold label and one short benefit, NEW in front of anything new, tie it to the tier that gets it with a 🔒 line, then 👉 link.", "launch": "LAUNCH: a confession hook, a short me-too reaction on its own line, what it costs them now (time, stress, missed chances), a scenario list with a matching emoji per line, ✅ how it works in short steps, the launch price next to the regular price with the reason and code (only if I gave them), the fine print in one line, 👉 link, ask buyers to come back and share their stories, and end on a funny, true one-liner."};
+  var SHAPE_HINTS = { auto: "Claude picks the shape that fits what you're sharing.", tip: "Teach one thing first, then invite them in. Great for your community or a paid tier.", peek: "A casual invite to a free resource, new or newly updated.", spotlight: "Make one tool or perk the star, and tie it to the tier that gets it.", launch: "A new offer or product, with a launch price if you have one." };
+  function shapeBlock(k) {
+    if (SHAPES[k]) return "POST SHAPE (use this one)\n" + SHAPES[k];
+    return "POST SHAPE\nPick the one that fits best:\n" + Object.keys(SHAPES).map(function (x) { return "- " + SHAPES[x]; }).join("\n");
   }
   function playbookBlock() {
     return "\nSHE SELLS™\nBlend one of these selling rules into the post in a sentence or two, in my voice. Pick the one that fits best. Don't add a section or header for it, and don't name the rule.\n\n" + PLAYBOOK + "\n";
@@ -931,7 +953,9 @@
   function renderBuild() {
     var b = S.build;
     $("bAbout").value = b.about || ""; $("bPromo").value = b.promo || ""; $("bLink").value = b.link || "";
-    $("bSells").checked = !!b.sells; $("bImg").checked = !!b.img;
+    $("bSells").checked = !!b.sells; $("bStyle").checked = b.style !== false;
+    document.querySelectorAll("[data-shape]").forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-shape") === (b.shape || "auto")); });
+    $("bShapeHint").textContent = SHAPE_HINTS[b.shape || "auto"]; $("bImg").checked = !!b.img;
     document.querySelectorAll("[data-where]").forEach(function (c) { c.classList.toggle("on", c.getAttribute("data-where") === b.where); });
     document.querySelectorAll("[data-v]").forEach(function (c) { c.classList.toggle("on", +c.getAttribute("data-v") === +b.versions); });
     $("bDay").innerHTML = dayOptions(todayIdx());
@@ -948,6 +972,8 @@
     $(id).addEventListener("input", function () { S.build[{ bAbout: "about", bPromo: "promo", bLink: "link" }[id]] = this.value; bSync(); });
   });
   $("bFor").addEventListener("change", function () { S.build.forId = this.value; renderBuild(); save(); });
+  $("bStyle").addEventListener("change", function () { S.build.style = this.checked; bSync(); });
+  $("bShape").addEventListener("click", function (e) { var c = e.target.closest("[data-shape]"); if (!c) return; S.build.shape = c.getAttribute("data-shape"); renderBuild(); save(); });
   $("bSells").addEventListener("change", function () { S.build.sells = this.checked; bSync(); });
   $("bImg").addEventListener("change", function () { S.build.img = this.checked; bSync(); });
   $("bWhere").addEventListener("click", function (e) { var c = e.target.closest("[data-where]"); if (!c) return; S.build.where = c.getAttribute("data-where"); renderBuild(); save(); });
