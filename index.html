@@ -210,6 +210,18 @@
   .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--fg); color: var(--on-gold); font-weight: 600; font-size: 14px; padding: 11px 18px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100% - 32px); text-align: center; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  .navsel { display: none; width: auto; min-width: 0; flex: 0 1 210px; font-weight: 600; background: var(--surface); }
+  .pbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .pbar .label { margin: 0; }
+  .pbar select { flex: 1 1 260px; min-width: 0; width: 100%; max-width: 560px; text-overflow: ellipsis; }
+  @media (max-width: 640px) {
+    nav.tabs { display: none; }
+    .navsel { display: block; }
+    header.top { flex-wrap: nowrap; }
+    .brand { font-size: 28px; white-space: nowrap; }
+    .brand .sync { display: none; }
+    .pbar select { max-width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -222,6 +234,13 @@
       <a href="#favorites" data-nav="favorites">&#9733; Favorites</a>
       <a href="#groups" data-nav="groups">Groups &amp; offers</a>
     </nav>
+    <label class="sr" for="navSel">Go to</label>
+    <select class="navsel" id="navSel">
+      <option value="week">&#128197; My week</option>
+      <option value="build">&#127908; Build a post</option>
+      <option value="favorites">&#9733; Favorites</option>
+      <option value="groups">&#128101; Groups &amp; offers</option>
+    </select>
   </header>
 
   <!-- WEEK -->
@@ -259,8 +278,8 @@
       <h2>Open your saved week</h2>
       <p class="hint" style="margin:0" id="fileInfo"></p>
       <div class="choice">
-        <div class="choice-txt"><b>Just update what I posted</b><span>Brings over the groups you marked posted and any new favorites. Your posts and edits on this device stay as they are.</span></div>
-        <button class="btn primary" type="button" id="fileMarks">Update what I posted</button>
+        <div class="choice-txt"><b>Add what's new</b><span>Brings in new posts, the groups you marked posted, your group and offer setup, and new favorites. Posts already on this device keep your edits.</span></div>
+        <button class="btn primary" type="button" id="fileMarks">Add what's new</button>
       </div>
       <div class="choice">
         <div class="choice-txt"><b>Replace everything</b><span>Swaps this device's week for the file: posts, images, groups, offers and favorites.</span></div>
@@ -281,14 +300,12 @@
         <button class="btn" type="button" id="addCancel">Cancel</button>
       </div>
     </div>
-    <div class="showbar" data-showbar></div>
     <div class="week" id="weekGrid"></div>
   </section>
 
   <!-- DAY -->
   <section id="vDay" hidden>
     <a class="back" href="#week">&larr; Back to the week</a>
-    <nav class="daynav" id="dayNav" aria-label="Days"></nav>
     <h1 id="dayTitle">Monday</h1>
     <div class="showbar" data-showbar></div>
     <div id="dayBody"></div>
@@ -715,6 +732,7 @@
     ["vWeek", "vDay", "vBuild", "vFavs", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
     var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : view === "vFavs" ? "favorites" : "groups";
     document.querySelectorAll("[data-nav]").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-nav") === nav); });
+    $("navSel").value = nav;
   }
   function route(keep) {
     var raw = (location.hash || "").replace("#", "");
@@ -737,6 +755,7 @@
     try { history.replaceState(null, "", location.href.split("#")[0] + "#" + h); } catch (e) { try { location.hash = h; } catch (e2) {} }
     route();
   }
+  $("navSel").addEventListener("change", function () { go(this.value); });
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest('a[href^="#"]');
     if (!a) return;
@@ -752,7 +771,7 @@
     markDirty();
     var t = todayIdx();
     $("weekGrid").innerHTML = DAYS.map(function (d, i) {
-      var ps = shownFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
+      var ps = postsFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
       return '<button class="day' + (i === t ? " today" : "") + '" type="button" data-day="' + i + '">' +
         '<span class="dname">' + d + '<span class="count' + (ps.length ? " has" : "") + '">' + (ps.length ? ps.length + (ps.length === 1 ? " post" : " posts") : "Nothing yet") + '</span></span>' +
         (withImg ? '<img class="thumb" alt="" src="' + esc(imgSrc(withImg)) + '">' : '<span class="thumb empty">' + (ps.length ? "No image yet" : "Tap to add") + '</span>') +
@@ -852,15 +871,22 @@
   $("fileCancel").addEventListener("click", function () { pending = null; $("filePanel").hidden = true; });
   $("fileMarks").addEventListener("click", function () {
     if (!pending) return;
-    var matched = 0, newFavs = 0;
+    var before = JSON.stringify(S), added = 0, matched = 0, newFavs = 0;
+    (pending.groups || []).forEach(function (g) { var i = S.groups.findIndex(function (x) { return x.id === g.id; }); if (i === -1) S.groups.push(g); else S.groups[i] = g; });
+    (pending.offers || []).forEach(function (o) { var i = S.offers.findIndex(function (x) { return x.id === o.id; }); if (i === -1) S.offers.push(o); else S.offers[i] = o; });
     pending.posts.forEach(function (fp) {
       var lp = S.posts.find(function (x) { return x.id === fp.id; });
-      if (lp) { lp.posted = Object.assign({}, fp.posted || {}); matched++; }
+      if (lp) { lp.posted = Object.assign({}, fp.posted || {}); if (!lp.img && fp.img) lp.img = fp.img; matched++; }
+      else { S.posts.push(Object.assign({ img: "", imgPrompt: "", posted: {} }, fp)); added++; }
     });
     (pending.favs || []).forEach(function (fv) { if (!S.favs.some(function (x) { return x.id === fv.id || (fv.src && x.src === fv.src); })) { S.favs.push(fv); newFavs++; } });
-    if (!matched && !newFavs) { toast("None of these posts are on this device. Use Replace everything instead."); return; }
-    save(); pending = null; $("filePanel").hidden = true; renderWeek();
-    toast("Updated " + matched + (matched === 1 ? " post" : " posts") + (newFavs ? " and added " + newFavs + (newFavs === 1 ? " favorite" : " favorites") : ""));
+    if (!save()) { S = JSON.parse(before); toast("This device ran out of room for the images. Remove a few images here and try again."); return; }
+    pending = null; $("filePanel").hidden = true; renderWeek();
+    var bits = [];
+    if (added) bits.push("added " + added + (added === 1 ? " new post" : " new posts"));
+    if (matched) bits.push("updated " + matched);
+    if (newFavs) bits.push(newFavs + (newFavs === 1 ? " new favorite" : " new favorites"));
+    toast(bits.length ? "Done: " + bits.join(", ") : "Everything was already up to date");
   });
   $("fileGo").addEventListener("click", function () {
     var btn = this;
@@ -886,7 +912,6 @@
 
   function renderDay(d) {
     $("dayTitle").textContent = DAYS[d];
-    $("dayNav").innerHTML = DAYS.map(function (x, i) { var n = shownFor(i).length; return '<a href="#' + slug(i) + '" class="' + (i === d ? "on" : "") + '">' + x.slice(0, 3) + (n ? '<span class="n">' + n + "</span>" : "") + "</a>"; }).join("");
     renderShow();
     var ps = shownFor(d);
     if (!ps.length) {
@@ -898,8 +923,11 @@
     var cf = pFor(cur), today = targetsFor(cur, d), off = promoish(cf) ? promoGroups().length - today.length : 0;
     var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
     $("dayBody").innerHTML =
-      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + (favOf(p) ? '<span class="star" aria-label="Favorite">&#9733;</span>' : "") + (showing() === "all" ? '<span class="pf">' + esc(forLabel(pFor(p))) + "</span>" : "") + "</button>"; }).join("") +
-      '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
+      '<div class="pbar"><label class="label" for="postSel">Post</label><select id="postSel">' + ps.map(function (p, i) {
+        var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length;
+        var t = toPlain(p.title || "Untitled post"); if (t.length > 42) t = t.slice(0, 40).trim() + "\u2026";
+        return '<option value="' + p.id + '"' + (p.id === cur.id ? " selected" : "") + ">" + esc((i + 1) + ". " + t + (favOf(p) ? " \u2605" : "") + (n ? "  \u2713" + n : "") + (showing() === "all" ? "  \u00b7 " + forLabel(pFor(p)) : "")) + "</option>";
+      }).join("") + '</select><button class="btn small" type="button" data-act="paste-here">&#10133; Add a post</button></div>' +
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
         '<div class="skool"><div class="who"><div class="av">' + (MEMBER ? "&#9829;" : "A") + '</div><div><div class="nm">' + (MEMBER ? "You" : "Aurailia Arnold") + '</div><div class="meta">just now</div></div></div>' +
@@ -1038,6 +1066,7 @@
     if (e.target.id === "sBody") { p.body = e.target.value; var f2 = favOf(p); if (f2) f2.body = p.body; grow(e.target); save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
+    if (e.target.id === "postSel") { curPost[curDay] = e.target.value; renderDay(curDay); return; }
     if (e.target.id === "pFor") { var pf = curP(); pf.for = e.target.value; save(); if (!visible(pf)) { delete curPost[curDay]; toast("Moved to " + showLabel(pf.for) + ". Switch Showing to see it."); } else toast("Set to " + forLabel(pf.for)); renderDay(curDay); return; }
     if (e.target.id !== "moveDay") return;
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
@@ -1138,7 +1167,7 @@
     if (SHAPES[k]) return "POST SHAPE (use this one)\n" + SHAPES[k];
     return "POST SHAPE\nPick the one that fits best:\n" + Object.keys(SHAPES).map(function (x) { return "- " + SHAPES[x]; }).join("\n");
   }
-  var IMG_TEMPLATE = "Create a square 1:1 banner for a community post. It should look like it belongs with my other graphics.\n\nMATCH MY BRAND\n- Look at the banners and graphics you've made for me before, in this chat, this project or your memory of me, and match that style: my colors, fonts, decorative details, textures and overall feel.\n- If you haven't made graphics for me before, ask me to upload 2 or 3 of my banners, or tell you my brand colors and fonts, before you create it. Don't guess.\n- If my banners usually include a photo of me, ask if I want to be in this one too.\n\nTHE BANNER\n- Text on the image, spelled exactly: \"[the post title]\"\n- What it shows: [one or two lines on a scene or objects that fit this post]\n- Keep it clean and easy to read on a phone. Not too busy.";
+  var IMG_TEMPLATE = "Create a square 1:1 banner for a community post. It should look like it belongs with my other graphics.\n\nMATCH MY BRAND\n- Look at the banners and graphics you've made for me before, in this chat, this project or your memory of me, and match that style: my colors, fonts, decorative details, textures and overall feel.\n- If you haven't made graphics for me before, ask me to upload 2 or 3 of my banners, or tell you my brand colors and fonts, before you create it. Don't guess.\n- If my banners usually include a photo of me, ask if I want to be in this one too.\n\nTHE BANNER\n- Main text: what I'm promoting, spelled exactly, as a short invitation like \"Join [my community]\" or the name of my offer: \"[what I'm promoting]\"\n- Second line: the special from the post, word for word, like a launch price or \"this weekend only\": \"[the special, or leave this line off if there isn't one]\"\n- Don't put the post's title or hook on the image. If the post isn't promoting anything, use the post title instead.\n- What it shows: [one or two lines on a scene or objects that fit this post]\n- Keep it clean and easy to read on a phone. Not too busy.";
   function playbookBlock() {
     return "\nSHE SELLS™\nBlend one of these selling rules into the post in a sentence or two, in my voice. Pick the one that fits best. Don't add a section or header for it, and don't name the rule.\n\n" + PLAYBOOK + "\n";
   }
