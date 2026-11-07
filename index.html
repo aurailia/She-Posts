@@ -175,6 +175,31 @@
   .showbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
   .showbar .label { margin: 0; }
   .showbar select { width: auto; min-width: 220px; max-width: 100%; }
+  .favs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+  .fav { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .fav .thumb { aspect-ratio: 1 / 1; }
+  .fav .ft { font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
+  .fav .fb { color: var(--muted); font-size: 15px; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+  .fav .fm { font-size: 13px; color: var(--faint); }
+  .fav .row select { width: auto; flex: 1 1 140px; }
+  .ptab .star { color: var(--gold); margin-left: 4px; }
+  .ptab.on .star { color: var(--on-gold); }
+  .btn.faved { background: var(--surface-2); border-color: var(--gold); color: var(--gold); }
+  .gsec { margin-bottom: 30px; }
+  .gsec h2 { margin: 0 0 2px; }
+  .gsub { margin: 0 0 12px; font-size: 16px; }
+  .btn.dirty { border-color: var(--gold); color: var(--gold); }
+  .btn .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--blush); }
+  .savenote { width: 100%; text-align: right; font-size: 14px; color: var(--faint); margin: 0; }
+  .savenote.warn { color: var(--blush); }
+  @media (max-width: 600px) { .savenote { text-align: left; } }
+  .steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 17px; }
+  .steps li::marker { color: var(--gold); font-weight: 700; }
+  .choice { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+  .choice.col { flex-direction: column; align-items: stretch; }
+  .choice.col .choice-txt { flex: none; }
+  .choice-txt { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
+  .choice-txt span { font-size: 15px; color: var(--muted); }
   .mine-note { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
   .ptab .pn { font-size: 12px; font-weight: 700; opacity: .85; margin-left: 4px; }
   .tick.full { opacity: .5; cursor: not-allowed; }
@@ -194,7 +219,8 @@
     <nav class="tabs" aria-label="Sections">
       <a href="#week" data-nav="week">My week</a>
       <a href="#build" data-nav="build">Build a post</a>
-      <a href="#groups" data-nav="groups">My groups</a>
+      <a href="#favorites" data-nav="favorites">&#9733; Favorites</a>
+      <a href="#groups" data-nav="groups">Groups &amp; offers</a>
     </nav>
   </header>
 
@@ -208,29 +234,39 @@
         <button class="btn" type="button" id="openAdd">&#10133; Paste a post</button>
       </div>
       <div class="row">
-        <button class="btn small" type="button" id="fileSave">&#128190; Save to a file</button>
-        <button class="btn small" type="button" id="fileOpen">&#128194; Open a file</button>
-        <button class="btn small" type="button" id="moveOpen">&#128228; Move my week</button>
-        <button class="btn small" type="button" id="pasteOpen">&#128229; Paste my week</button>
+        <button class="btn small" type="button" id="fileSave">&#128260; Phone &amp; computer</button>
         <button class="btn small danger" type="button" id="clearWeek">Clear the week</button>
       </div>
+      <p class="savenote" id="saveNote" hidden></p>
     </div>
-    <div class="panel" id="movePanel" hidden style="margin-bottom:16px">
-      <h2>Move my week to another device</h2>
-      <p class="hint" style="margin:0">Send this link to yourself (text, email or AirDrop) and open it on your other phone or computer. Your posts, titles and groups come with it. Images stay on this device. To bring images too, use Save to a file.</p>
-      <div class="out" id="moveOut" style="max-height:110px;overflow-wrap:anywhere"></div>
-      <div class="row"><button class="btn primary" type="button" id="moveCopy">Copy the link</button><button class="btn" type="button" id="moveClose">Done</button></div>
+    <div class="panel" id="savePanel" hidden style="margin-bottom:16px">
+      <h2>Phone &amp; computer</h2>
+      <p class="hint" style="margin:0">Keep both devices up to date.</p>
+      <div class="choice col">
+        <div class="choice-txt"><b>&#128279; Quick update</b><span>Just the groups you marked posted. No posts or images.</span></div>
+        <ol class="steps"><li>On the device you posted from, tap <b>Copy my updates</b>.</li><li>Send it to yourself (text, email or Notes).</li><li>On your other device, paste it in the box and tap <b>Update</b>.</li></ol>
+        <div class="row"><button class="btn primary" type="button" id="marksCopy">Copy my updates</button></div>
+        <div class="row" style="width:100%"><label for="marksPaste" class="sr">Paste your updates</label><input id="marksPaste" type="text" placeholder="Paste your updates here" style="flex:1 1 220px;min-width:0"><button class="btn primary" type="button" id="marksGo">Update</button></div>
+      </div>
+      <div class="choice col">
+        <div class="choice-txt"><b>&#128190; Everything, in a file</b><span>Posts, images, groups, offers and favorites. Use this when you've added or changed posts.</span></div>
+        <ol class="steps" id="saveSteps"></ol>
+        <div class="row"><button class="btn primary" type="button" id="saveNow">&#128190; Save to a file</button><button class="btn" type="button" id="fileOpen">&#128194; Open a file</button></div>
+      </div>
+      <div class="row"><button class="btn small" type="button" id="saveClose">Close</button></div>
     </div>
     <div class="panel" id="filePanel" hidden style="margin-bottom:16px">
       <h2>Open your saved week</h2>
       <p class="hint" style="margin:0" id="fileInfo"></p>
-      <div class="row"><button class="btn primary" type="button" id="fileGo">Replace my week</button><button class="btn" type="button" id="fileCancel">Cancel</button></div>
-    </div>
-    <div class="panel" id="pastePanel" hidden style="margin-bottom:16px">
-      <h2>Paste my week</h2>
-      <p class="hint" style="margin:0">This replaces the week on this device with the one you moved. Images already on this device stay put.</p>
-      <div class="field"><label for="pasteText" class="sr">Your week link</label><textarea id="pasteText" style="min-height:90px" placeholder="Paste the link you copied"></textarea></div>
-      <div class="row"><button class="btn primary" type="button" id="pasteGo">Replace my week</button><button class="btn" type="button" id="pasteClose">Cancel</button></div>
+      <div class="choice">
+        <div class="choice-txt"><b>Just update what I posted</b><span>Brings over the groups you marked posted and any new favorites. Your posts and edits on this device stay as they are.</span></div>
+        <button class="btn primary" type="button" id="fileMarks">Update what I posted</button>
+      </div>
+      <div class="choice">
+        <div class="choice-txt"><b>Replace everything</b><span>Swaps this device's week for the file: posts, images, groups, offers and favorites.</span></div>
+        <button class="btn" type="button" id="fileGo">Replace my week</button>
+      </div>
+      <div class="row"><button class="btn small" type="button" id="fileCancel">Cancel</button></div>
     </div>
     <div class="panel" id="addPanel" hidden style="margin-bottom:16px">
       <div class="field">
@@ -274,6 +310,7 @@
           </div>
         </div>
         <div class="field">
+          <div id="bOfferWrap" hidden style="margin-bottom:8px"><label for="bOffer">Pick one of your offers</label><select id="bOffer"></select></div>
           <label for="bPromo">What are you promoting? (optional)</label>
           <input id="bPromo" type="text" placeholder="e.g. She Promotes VIP, the Business Alignment Blueprint, Embody Wealth">
         </div>
@@ -295,7 +332,7 @@
           <div id="bForWrap" hidden style="margin-top:10px">
             <label for="bFor">Which community?</label>
             <select id="bFor"></select>
-            <p class="hint" id="bForHint" hidden>Mark your own communities in <a href="#groups" style="color:var(--gold)">My groups</a> and they'll show up here.</p>
+            <p class="hint" id="bForHint" hidden>Add your own communities in <a href="#groups" style="color:var(--gold)">Groups &amp; offers</a> and they'll show up here.</p>
           </div>
         </div>
         <div class="field">
@@ -344,15 +381,44 @@
     </div>
   </section>
 
+  <!-- FAVORITES -->
+  <section id="vFavs" hidden>
+    <h1>Favorites</h1>
+    <p class="lede">Posts that did well, saved to use again. Star a post on any day to keep it here. Clearing the week won't touch them.</p>
+    <div class="favs" id="favList"></div>
+  </section>
+
   <!-- GROUPS -->
   <section id="vGroups" hidden>
-    <h1>My groups</h1>
-    <p class="lede">The communities you post in. Mark the ones you own as My community. For promo groups, set the days you can promote and how many posts a day they allow. Each day only shows the groups you can post in, and keeps count for you.</p>
-    <div class="panel">
-      <div class="glist" id="gList"></div>
-      <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a group</button></div>
-      <p class="hint">Everything saves on this device. To use your week on another phone or computer, tap Move my week on the My week page.</p>
+    <h1>Groups &amp; offers</h1>
+    <p class="lede">Set this up once. She Posts uses it to show you where to post each day.</p>
+    <div id="grpWrap">
+      <div class="gsec">
+        <h2>&#128227; Where I promote</h2>
+        <p class="hint gsub">Promo groups you post in. Tap the days they allow and how many posts a day.</p>
+        <div class="panel">
+          <div class="glist" id="gList"></div>
+          <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a promo group</button></div>
+        </div>
+      </div>
+      <div class="gsec">
+        <h2>&#127969; My communities</h2>
+        <p class="hint gsub">Communities you own. Posts for them can go up any day. Skip this if you don't have one.</p>
+        <div class="panel">
+          <div class="glist" id="cList"></div>
+          <div class="row"><button class="btn" type="button" id="cAdd">&#10133; Add my community</button></div>
+        </div>
+      </div>
     </div>
+    <div class="gsec">
+      <h2>&#128717;&#65039; My offers</h2>
+      <p class="hint gsub">What you sell or promote, like a session, a course or a product. Set a post to an offer and you'll see your promo groups for that day.</p>
+      <div class="panel">
+        <div class="glist" id="oList"></div>
+        <div class="row"><button class="btn" type="button" id="oAdd">&#10133; Add an offer</button></div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:18px">Everything saves on this device. To use it on another phone or computer, tap Save to a file on the My week page.</p>
   </section>
 </div>
 <div class="toast" id="toast" hidden role="status"></div>
@@ -427,10 +493,11 @@
     try { var raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); } } catch (e) {}
     if (!S || !S.posts) S = JSON.parse(JSON.stringify(SEED));
     S.build = Object.assign({}, SEED.build, S.build || {});
-    S.groups = S.groups || [];
+    S.groups = S.groups || []; S.offers = S.offers || []; S.favs = S.favs || [];
   }
-  function save() {
-    S.updatedAt = Date.now();
+  function save(quiet) {
+    if (!quiet) S.updatedAt = Date.now();
+    setTimeout(markDirty, 0);
     queueCloud();
     try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
     catch (e) { if (cloud) return true; toast("Storage is full. Remove an image or clear the week, then try again."); return false; }
@@ -441,7 +508,7 @@
   function unb64u(str) { str = str.replace(/-/g, "+").replace(/_/g, "/"); while (str.length % 4) str += "="; var bin = atob(str), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
   function streamBytes(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
   function packWeek() {
-    var data = { posts: S.posts.map(function (p) { return { id: p.id, day: p.day, for: p.for || "promo", title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", posted: p.posted || {} }; }), groups: S.groups, build: S.build, updatedAt: S.updatedAt || Date.now() };
+    var data = { posts: S.posts.map(function (p) { return { id: p.id, day: p.day, for: p.for || "promo", title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", posted: p.posted || {} }; }), groups: S.groups, offers: S.offers, favs: (S.favs || []).map(function (x) { return Object.assign({}, x, { img: "" }); }), build: S.build, updatedAt: S.updatedAt || Date.now() };
     var bytes = new TextEncoder().encode(JSON.stringify(data));
     if (typeof CompressionStream === "function") return streamBytes(bytes, new CompressionStream("deflate-raw")).then(function (z) { return "import-z" + b64u(z); });
     return Promise.resolve("import-p" + b64u(bytes));
@@ -453,11 +520,24 @@
     var p = m[1] === "z" ? streamBytes(bytes, new DecompressionStream("deflate-raw")) : Promise.resolve(bytes);
     return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
   }
+  function packMarks() {
+    var data = { m: S.posts.map(function (p) { return [p.id, Object.keys(p.posted || {}).filter(function (k) { return p.posted[k]; })]; }) };
+    var bytes = new TextEncoder().encode(JSON.stringify(data));
+    if (typeof CompressionStream === "function") return streamBytes(bytes, new CompressionStream("deflate-raw")).then(function (z) { return "SPZ" + b64u(z); });
+    return Promise.resolve("SPP" + b64u(bytes));
+  }
+  function unpackMarks(code) {
+    var m = String(code).match(/SP([ZP])([A-Za-z0-9_-]+)/);
+    if (!m) return Promise.reject(new Error("bad"));
+    var bytes = unb64u(m[2]);
+    var p = m[1] === "Z" ? streamBytes(bytes, new DecompressionStream("deflate-raw")) : Promise.resolve(bytes);
+    return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)).m || []; });
+  }
   function weekLink(code) { return location.href.split("#")[0] + "#" + code; }
   function applyWeek(data) {
     var localImg = {}; S.posts.forEach(function (p) { if (p.img || p.imgId) localImg[p.id] = { img: p.img, imgId: p.imgId }; });
     S.posts = (data.posts || []).map(function (p) { var li = localImg[p.id] || {}; return Object.assign({ img: li.img || "", imgId: li.imgId || "" }, p, { posted: p.posted || {} }); });
-    S.groups = data.groups || S.groups; S.build = Object.assign({}, SEED.build, data.build || {});
+    S.groups = data.groups || S.groups; S.offers = data.offers || S.offers; S.favs = mergeFavs(S.favs, data.favs); S.build = Object.assign({}, SEED.build, data.build || {});
     save();
   }
 
@@ -522,30 +602,39 @@
   function groupsFor(d) { return S.groups.filter(function (g) { return !g.mine && gDays(g).indexOf(d) !== -1; }); }
   function mineGroups() { return S.groups.filter(function (g) { return g.mine; }); }
   function promoGroups() { return S.groups.filter(function (g) { return !g.mine; }); }
-  function pFor(p) { var f = p.for || "promo"; if (f === "promo" || f === "social") return f; return S.groups.some(function (g) { return g.id === f && g.mine; }) ? f : "promo"; }
-  function forLabel(f) { if (f === "promo") return "Promo post"; if (f === "social") return "Social media"; var g = S.groups.find(function (x) { return x.id === f; }); return g ? (g.name || "My community") : "Promo post"; }
-  function forOptions(sel) {
-    var m = mineGroups();
-    return (m.length ? '<optgroup label="My communities">' + m.map(function (g) { return '<option value="' + g.id + '"' + (sel === g.id ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("") + "</optgroup>" : "") +
-      '<optgroup label="Other communities"><option value="promo"' + (sel === "promo" ? " selected" : "") + '>Promo posts</option><option value="social"' + (sel === "social" ? " selected" : "") + ">Social media</option></optgroup>";
+  function isOffer(f) { return (S.offers || []).some(function (o) { return o.id === f; }); }
+  function isMine(f) { return S.groups.some(function (g) { return g.id === f && g.mine; }); }
+  function promoish(f) { return f === "promo" || isOffer(f); }
+  function validFor(f) { return f === "promo" || f === "social" || isMine(f) || isOffer(f); }
+  function pFor(p) { var f = p.for || "promo"; return validFor(f) ? f : "promo"; }
+  function forLabel(f) {
+    if (f === "promo") return "Promo post"; if (f === "social") return "Social media";
+    var o = (S.offers || []).find(function (x) { return x.id === f; }); if (o) return o.name || "My offer";
+    var g = S.groups.find(function (x) { return x.id === f; }); return g ? (g.name || "My community") : "Promo post";
   }
-  function targetsFor(p, d) { var f = pFor(p); if (f === "social") return []; if (f === "promo") return groupsFor(d); return S.groups.filter(function (g) { return g.id === f; }); }
+  function forGroups(sel, promoLabel) {
+    var opt = function (v, t) { return '<option value="' + v + '"' + (sel === v ? " selected" : "") + ">" + esc(t) + "</option>"; };
+    var m = mineGroups(), o = S.offers || [];
+    return (m.length ? '<optgroup label="My communities">' + m.map(function (g) { return opt(g.id, g.name || "My community"); }).join("") + "</optgroup>" : "") +
+      (o.length ? '<optgroup label="My offers">' + o.map(function (x) { return opt(x.id, x.name || "My offer"); }).join("") + "</optgroup>" : "") +
+      '<optgroup label="Other">' + opt("promo", promoLabel) + opt("social", "Social media") + "</optgroup>";
+  }
+  function forOptions(sel) { return forGroups(sel, "Promo posts"); }
+  function targetsFor(p, d) { var f = pFor(p); if (f === "social") return []; if (promoish(f)) return groupsFor(d); return S.groups.filter(function (g) { return g.id === f; }); }
   function postsFor(d) { return S.posts.filter(function (p) { return p.day === d; }); }
-  function showing() { var f = S.show || "all"; if (f === "all" || f === "promo" || f === "social") return f; return S.groups.some(function (g) { return g.id === f && g.mine; }) ? f : "all"; }
+  function showing() { var f = S.show || "all"; return f === "all" || validFor(f) ? f : "all"; }
   function visible(p) { var f = showing(); return f === "all" || pFor(p) === f; }
   function shownFor(d) { return postsFor(d).filter(visible); }
   function showLabel(f) { return f === "all" ? "All posts" : f === "promo" ? "Promo posts" : forLabel(f); }
   function newFor() { var f = showing(); return f === "all" ? "promo" : f; }
   function renderShow() {
-    var f = showing(), m = mineGroups();
-    var html = '<label class="label">Showing</label><select data-show aria-label="Which posts to show"><option value="all"' + (f === "all" ? " selected" : "") + ">All posts</option>" +
-      (m.length ? '<optgroup label="My communities">' + m.map(function (g) { return '<option value="' + g.id + '"' + (f === g.id ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("") + "</optgroup>" : "") +
-      '<optgroup label="Other communities"><option value="promo"' + (f === "promo" ? " selected" : "") + '>Promo posts</option><option value="social"' + (f === "social" ? " selected" : "") + ">Social media</option></optgroup></select>";
+    var f = showing();
+    var html = '<label class="label">Showing</label><select data-show aria-label="Which posts to show"><option value="all"' + (f === "all" ? " selected" : "") + ">All posts</option>" + forGroups(f, "Promo posts") + "</select>";
     document.querySelectorAll("[data-showbar]").forEach(function (el) { el.innerHTML = html; });
   }
   document.addEventListener("change", function (e) {
     if (!e.target.matches || !e.target.matches("[data-show]")) return;
-    S.show = e.target.value; save();
+    S.show = e.target.value; save(true);
     if (!$("vDay").hidden) renderDay(curDay); else renderWeek();
   });
   function todayIdx() { var d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
@@ -623,24 +712,22 @@
   /* ---------- views ---------- */
   var curDay = 0, curPost = {};
   function show(view) {
-    ["vWeek", "vDay", "vBuild", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
-    var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : "groups";
+    ["vWeek", "vDay", "vBuild", "vFavs", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
+    var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : view === "vFavs" ? "favorites" : "groups";
     document.querySelectorAll("[data-nav]").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-nav") === nav); });
   }
   function route(keep) {
     var raw = (location.hash || "").replace("#", "");
     if (raw.indexOf("import-") === 0) {
       try { history.replaceState(null, "", location.href.split("#")[0] + "#week"); } catch (e) {}
-      show("vWeek"); renderWeek();
-      $("pasteText").value = location.href.split("#")[0] + "#" + raw; $("pastePanel").hidden = false; $("movePanel").hidden = true;
-      toast("Tap Replace my week to bring it in");
-      return;
+      show("vWeek"); renderWeek(); return;
     }
     var h = raw.toLowerCase();
     var d = DAYS.map(function (x) { return x.toLowerCase(); }).indexOf(h);
     if (d !== -1) { curDay = d; show("vDay"); renderDay(d); }
     else if (h === "build") { show("vBuild"); renderBuild(); }
     else if (h === "groups") { show("vGroups"); renderGroups(); }
+    else if (h === "favorites") { show("vFavs"); renderFavs(); }
     else { show("vWeek"); renderWeek(); }
     if (keep !== true) window.scrollTo(0, 0);
   }
@@ -662,6 +749,7 @@
   }
 
   function renderWeek() {
+    markDirty();
     var t = todayIdx();
     $("weekGrid").innerHTML = DAYS.map(function (d, i) {
       var ps = shownFor(i), first = ps[0], withImg = ps.find(function (p) { return imgSrc(p); });
@@ -685,24 +773,64 @@
     var d = +$("addDay").value, n = addPosts($("addText").value, d, $("addFor").value);
     if (n) { $("addText").value = ""; $("addPanel").hidden = true; toast("Added " + n + (n === 1 ? " post" : " posts") + " to " + DAYS[d]); renderWeek(); }
   });
-  $("moveOpen").addEventListener("click", function () {
-    $("pastePanel").hidden = true; $("movePanel").hidden = false; $("moveOut").textContent = "Making your link...";
-    packWeek().then(function (code) { $("moveOut").textContent = weekLink(code); }, function () { $("moveOut").textContent = "Something went wrong making the link. Try again."; });
-  });
-  $("moveCopy").addEventListener("click", function () { var t = $("moveOut").textContent; if (t.indexOf("#import-") === -1) return; copy(t, "Link copied. Send it to yourself."); });
-  $("moveClose").addEventListener("click", function () { $("movePanel").hidden = true; });
-  $("pasteOpen").addEventListener("click", function () { $("movePanel").hidden = true; $("pastePanel").hidden = false; $("pasteText").focus(); });
-  $("pasteClose").addEventListener("click", function () { $("pastePanel").hidden = true; });
 
   /* ---------- save to a file / open a file (images included) ---------- */
   function stamp() { var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  function isDirty() { return !!(S.updatedAt && (!S.fileSavedAt || S.updatedAt > S.fileSavedAt)); }
+  function markDirty() {
+    var b = $("fileSave"); if (!b) return;
+    var d = isDirty();
+    b.classList.toggle("dirty", d);
+    b.innerHTML = "&#128260; Phone &amp; computer" + (d ? ' <span class="dot" aria-hidden="true"></span>' : "");
+    var n = $("saveNote");
+    if (n) { n.hidden = false; n.textContent = d ? "Changes not saved yet. Tap Phone & computer before you switch devices." : (S.fileSavedAt ? "Saved to a file " + new Date(S.fileSavedAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : ""); n.classList.toggle("warn", d); }
+  }
+  function markSaved() { S.fileSavedAt = Date.now(); save(true); }
   $("fileSave").addEventListener("click", function () {
-    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts, groups: S.groups, build: S.build, show: S.show || "all" };
-    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-    var url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = "she-posts-" + stamp() + ".json"; document.body.appendChild(a); a.click(); a.remove();
+    var p = $("savePanel");
+    if (!p.hidden) { p.hidden = true; return; }
+    $("saveSteps").innerHTML = touchDevice()
+      ? "<li>Tap <b>Save to a file</b>. Your share sheet opens.</li><li>Tap <b>Save to Files</b> and choose <b>iCloud Drive</b>.</li><li>On your computer, open She Posts, tap <b>Phone &amp; computer</b>, then <b>Open a file</b> and pick it.</li>"
+      : "<li>Click <b>Save to a file</b>. It lands in your Downloads.</li><li>Drag it into <b>iCloud Drive</b> (or email it to yourself) so your phone can reach it.</li><li>On your phone, open She Posts, tap <b>Phone &amp; computer</b>, then <b>Open a file</b> and pick it.</li>";
+    $("filePanel").hidden = true; p.hidden = false;
+  });
+  $("marksCopy").addEventListener("click", function () {
+    packMarks().then(function (code) { copy(code, "Copied. Send it to yourself, then paste it on your other device."); }, function () { toast("Something went wrong. Try again."); });
+  });
+  $("marksGo").addEventListener("click", function () {
+    var v = $("marksPaste").value.trim();
+    if (!v) { toast("Paste your updates in the box first"); return; }
+    unpackMarks(v).then(function (list) {
+      var matched = 0;
+      list.forEach(function (x) {
+        var lp = S.posts.find(function (p) { return p.id === x[0]; }); if (!lp) return;
+        var o = {}; (x[1] || []).forEach(function (g) { o[g] = true; }); lp.posted = o; matched++;
+      });
+      if (!matched) { toast("None of those posts are on this device. Use Everything, in a file instead."); return; }
+      $("marksPaste").value = ""; save(); renderWeek();
+      toast("Updated what you posted on " + matched + (matched === 1 ? " post" : " posts"));
+    }, function () { toast("That didn't work. Copy your updates again and paste the whole thing."); });
+  });
+  $("saveClose").addEventListener("click", function () { $("savePanel").hidden = true; });
+  $("saveNow").addEventListener("click", function () {
+    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts, groups: S.groups, offers: S.offers, favs: S.favs, build: S.build, show: S.show || "all" };
+    var text = JSON.stringify(data), name = "she-posts-" + stamp() + ".json";
+    var file = null, canShareFile = false;
+    if (touchDevice() && navigator.share && navigator.canShare) {
+      try {
+        file = new File([text], name, { type: "application/json" });
+        canShareFile = navigator.canShare({ files: [file] });
+        if (!canShareFile) { file = new File([text], name, { type: "text/plain" }); canShareFile = navigator.canShare({ files: [file] }); }
+      } catch (e) { canShareFile = false; }
+    }
+    if (canShareFile) {
+      navigator.share({ files: [file], title: "She Posts week" }).then(function () { markSaved(); $("savePanel").hidden = true; toast("Saved. Open it on your other device."); }, function () {});
+      return;
+    }
+    var url = URL.createObjectURL(new Blob([text], { type: "application/json" })), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    toast("Saved. Look in your Downloads.");
+    markSaved(); $("savePanel").hidden = true; toast("Saved. Look in your Downloads.");
   });
   var filePick = document.createElement("input"); filePick.type = "file"; filePick.hidden = true; document.body.appendChild(filePick);
   var pending = null;
@@ -715,30 +843,35 @@
       if (!data || data.app !== "she-posts" || !Array.isArray(data.posts)) { toast("That isn't a She Posts file. Pick the one you saved."); return; }
       pending = data;
       var n = data.posts.length, when = data.savedAt ? new Date(data.savedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-      $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". This replaces everything on this device, images and groups included.";
-      $("movePanel").hidden = true; $("pastePanel").hidden = true; $("filePanel").hidden = false;
+      $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". Choose what to bring over.";
+      $("savePanel").hidden = true; $("filePanel").hidden = false;
     };
     r.onerror = function () { toast("Couldn't open that file. Try again."); };
     r.readAsText(file);
   });
   $("fileCancel").addEventListener("click", function () { pending = null; $("filePanel").hidden = true; });
+  $("fileMarks").addEventListener("click", function () {
+    if (!pending) return;
+    var matched = 0, newFavs = 0;
+    pending.posts.forEach(function (fp) {
+      var lp = S.posts.find(function (x) { return x.id === fp.id; });
+      if (lp) { lp.posted = Object.assign({}, fp.posted || {}); matched++; }
+    });
+    (pending.favs || []).forEach(function (fv) { if (!S.favs.some(function (x) { return x.id === fv.id || (fv.src && x.src === fv.src); })) { S.favs.push(fv); newFavs++; } });
+    if (!matched && !newFavs) { toast("None of these posts are on this device. Use Replace everything instead."); return; }
+    save(); pending = null; $("filePanel").hidden = true; renderWeek();
+    toast("Updated " + matched + (matched === 1 ? " post" : " posts") + (newFavs ? " and added " + newFavs + (newFavs === 1 ? " favorite" : " favorites") : ""));
+  });
   $("fileGo").addEventListener("click", function () {
     var btn = this;
     arm(btn, "Replace my week", "Tap again to replace", function () {
       if (!pending) return;
       var before = JSON.stringify(S);
       S.posts = pending.posts.map(function (p) { return Object.assign({ img: "", imgPrompt: "", posted: {} }, p); });
-      S.groups = pending.groups || S.groups; S.build = Object.assign({}, SEED.build, pending.build || {}); S.show = pending.show || "all";
+      S.groups = pending.groups || S.groups; S.offers = pending.offers || S.offers; S.favs = pending.favs || S.favs; S.build = Object.assign({}, SEED.build, pending.build || {}); S.show = pending.show || "all";
       if (!save()) { S = JSON.parse(before); toast("This device ran out of room for all the images. Remove a few images and save the file again."); return; }
+      S.fileSavedAt = Date.now(); S.updatedAt = S.fileSavedAt; save(true);
       pending = null; $("filePanel").hidden = true; renderWeek(); toast("Your week is here");
-    });
-  });
-  $("pasteGo").addEventListener("click", function () {
-    var btn = this;
-    arm(btn, "Replace my week", "Tap again to replace", function () {
-      unpackWeek($("pasteText").value).then(function (data) {
-        applyWeek(data); $("pasteText").value = ""; $("pastePanel").hidden = true; renderWeek(); toast("Your week is here");
-      }, function () { toast("That link didn't work. Copy the whole link and try again."); });
     });
   });
   $("clearWeek").addEventListener("click", function () {
@@ -762,10 +895,10 @@
       return;
     }
     var cur = ps.find(function (p) { return p.id === curPost[d]; }) || ps[0]; curPost[d] = cur.id;
-    var cf = pFor(cur), today = targetsFor(cur, d), off = cf === "promo" ? promoGroups().length - today.length : 0;
+    var cf = pFor(cur), today = targetsFor(cur, d), off = promoish(cf) ? promoGroups().length - today.length : 0;
     var done = today.filter(function (g) { return cur.posted[g.id]; }).length;
     $("dayBody").innerHTML =
-      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + (showing() === "all" ? '<span class="pf">' + esc(forLabel(pFor(p))) + "</span>" : "") + "</button>"; }).join("") +
+      '<div class="ptabs" role="tablist">' + ps.map(function (p, i) { var n = Object.keys(p.posted || {}).filter(function (k) { return p.posted[k] && S.groups.some(function (g) { return g.id === k; }); }).length; return '<button class="ptab' + (p.id === cur.id ? " on" : "") + '" type="button" role="tab" aria-selected="' + (p.id === cur.id) + '" data-post="' + p.id + '">Post ' + (i + 1) + (n ? ' <span class="pn">\u2713 ' + n + "</span>" : "") + (favOf(p) ? '<span class="star" aria-label="Favorite">&#9733;</span>' : "") + (showing() === "all" ? '<span class="pf">' + esc(forLabel(pFor(p))) + "</span>" : "") + "</button>"; }).join("") +
       '<button class="ptab" type="button" data-act="paste-here">&#10133; Add</button></div>' +
       '<div class="panel" id="dayAdd" hidden style="margin-bottom:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>' +
       '<div class="daygrid"><div>' +
@@ -779,10 +912,11 @@
         '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type. Links show as [words](link) here and become real links when you copy the post.</p>' +
       '</div><div class="side">' +
         '<div class="panel"><label for="pFor" class="label">This post is for</label><select id="pFor">' + forOptions(cf) + "</select>" +
-          (mineGroups().length ? "" : '<p class="hint" style="margin:8px 0 0">Own a community? Mark it in <a href="#groups" style="color:var(--gold)">My groups</a> and it shows up here.</p>') + "</div>" +
+          (mineGroups().length || (S.offers || []).length ? "" : '<p class="hint" style="margin:8px 0 0">Add your offers or your own community in <a href="#groups" style="color:var(--gold)">Groups &amp; offers</a> and they show up here.</p>') + "</div>" +
         '<div class="panel"><span class="label">Copy</span><div class="row">' +
           '<button class="btn primary small" type="button" data-act="copy-title">Copy title</button>' +
           '<button class="btn primary small" type="button" data-act="copy-body">Copy post</button>' +
+          '<button class="btn small' + (favOf(cur) ? " faved" : "") + '" type="button" data-act="fav" aria-pressed="' + !!favOf(cur) + '">' + (favOf(cur) ? "&#9733; Favorite" : "&#9734; Add to favorites") + "</button>" +
           (cur.imgPrompt ? '<button class="btn small" type="button" data-act="copy-img">Copy image prompt</button>' : "") +
         '</div><div class="row">' +
           '<button class="btn small" type="button" data-act="img">' + (imgSrc(cur) ? "Change image" : "Add image") + "</button>" +
@@ -796,7 +930,7 @@
               (function () { var vs = []; ps.forEach(function (pp, ii) { if (pp.posted && pp.posted[g.id]) vs.push(ii + 1); }); return vs.length ? '<span class="gvers">' + vs.map(function (n) { return '<span class="vtag' + (ps[n - 1].id === cur.id ? " me" : "") + '">Post ' + n + "</span>"; }).join("") + "</span>" : ""; })() +
               "</span>" +
               '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Post " + (ps.indexOf(cur) + 1) + " posted" : full ? "Full today" : "Mark Post " + (ps.indexOf(cur) + 1) + " posted") + "</button></div>";
-          }).join("") + "</div>" : cf === "social" ? '<p class="hint">A social media post. Copy it and share it wherever you like.</p>' : '<p class="hint">' + (promoGroups().length ? "None of your promo groups take promos on " + DAYS[d] + "." : "Add your promo groups in") + ' <a href="#groups" style="color:var(--gold)">My groups</a>' + (promoGroups().length ? " to change their days." : ".") + "</p>") +
+          }).join("") + "</div>" : cf === "social" ? '<p class="hint">A social media post. Copy it and share it wherever you like.</p>' : '<p class="hint">' + (promoGroups().length ? "None of your promo groups take promos on " + DAYS[d] + "." : "Add your promo groups in") +  ' <a href="#groups" style="color:var(--gold)">Groups &amp; offers</a>' + (promoGroups().length ? " to change their days." : ".") + "</p>") +
           (today.length && off ? '<p class="hint">' + off + (off === 1 ? " group doesn\u2019t" : " groups don\u2019t") + " take promos on " + DAYS[d] + '. <a href="#groups" style="color:var(--gold)">Change days</a></p>' : "") +
         "</div>" +
         '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
@@ -900,8 +1034,8 @@
   function curP() { return S.posts.find(function (p) { return p.id === curPost[curDay]; }); }
   $("dayBody").addEventListener("input", function (e) {
     var p = curP(); if (!p) return;
-    if (e.target.id === "sTitle") { p.title = e.target.value; save(); }
-    if (e.target.id === "sBody") { p.body = e.target.value; grow(e.target); save(); }
+    if (e.target.id === "sTitle") { p.title = e.target.value; var f1 = favOf(p); if (f1) f1.title = p.title; save(); }
+    if (e.target.id === "sBody") { p.body = e.target.value; var f2 = favOf(p); if (f2) f2.body = p.body; grow(e.target); save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
     if (e.target.id === "pFor") { var pf = curP(); pf.for = e.target.value; save(); if (!visible(pf)) { delete curPost[curDay]; toast("Moved to " + showLabel(pf.for) + ". Switch Showing to see it."); } else toast("Set to " + forLabel(pf.for)); renderDay(curDay); return; }
@@ -935,6 +1069,16 @@
     }
     if (act === "copy-img") copy(p.imgPrompt, "Image prompt copied");
     if (act === "img") { pickFor = p.id; picker.click(); }
+    if (act === "fav") {
+      var fv = favOf(p);
+      if (fv) { S.favs = S.favs.filter(function (x) { return x !== fv; }); save(); toast("Removed from favorites"); }
+      else {
+        S.favs.unshift({ id: "f" + uid(), src: p.id, title: p.title, body: p.body, imgPrompt: p.imgPrompt || "", img: p.img || "", for: pFor(p), savedAt: Date.now() });
+        if (!save()) { S.favs[0].img = ""; save(); toast("Saved to favorites without the image. This device is out of room."); }
+        else toast("Saved to favorites \u2605");
+      }
+      renderDay(curDay);
+    }
     if (act === "img-save") saveImage(p);
     if (act === "img-copy") copyImage(p);
     if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
@@ -1011,12 +1155,22 @@
     $("bForWrap").hidden = b.where !== "community";
     $("bFor").hidden = !mg.length; $("bForHint").hidden = !!mg.length;
     $("bFor").innerHTML = mg.map(function (g) { return '<option value="' + g.id + '"' + (g.id === b.forId ? " selected" : "") + ">" + esc(g.name || "My community") + "</option>"; }).join("");
-    $("bAddFor").innerHTML = forOptions(b.where === "community" && b.forId ? b.forId : b.where === "social" ? "social" : "promo");
+    var offs = S.offers || [];
+    if (b.offerId && !isOffer(b.offerId)) b.offerId = "";
+    $("bOfferWrap").hidden = !offs.length;
+    $("bOffer").innerHTML = '<option value="">Something else (type it below)</option>' + offs.map(function (o) { return '<option value="' + o.id + '"' + (o.id === b.offerId ? " selected" : "") + ">" + esc(o.name || "My offer") + "</option>"; }).join("");
+    $("bAddFor").innerHTML = forOptions(b.where === "community" && b.forId ? b.forId : b.where === "social" ? "social" : b.offerId || "promo");
     $("bOut").textContent = buildPrompt();
   }
   function bSync() { $("bOut").textContent = buildPrompt(); save(); }
   ["bAbout", "bPromo", "bLink"].forEach(function (id) {
     $(id).addEventListener("input", function () { S.build[{ bAbout: "about", bPromo: "promo", bLink: "link" }[id]] = this.value; bSync(); });
+  });
+  $("bOffer").addEventListener("change", function () {
+    var o = (S.offers || []).find(function (x) { return x.id === $("bOffer").value; });
+    S.build.offerId = o ? o.id : "";
+    if (o) { S.build.promo = o.name || ""; S.build.link = o.link || ""; }
+    renderBuild(); save();
   });
   $("bFor").addEventListener("change", function () { S.build.forId = this.value; renderBuild(); save(); });
   $("bStyle").addEventListener("change", function () { S.build.style = this.checked; bSync(); });
@@ -1053,30 +1207,35 @@
 
   /* ---------- groups ---------- */
   function renderGroups() {
-    $("gList").innerHTML = S.groups.length ? S.groups.map(function (g) {
+    renderOffers();
+    function card(g) {
       var days = gDays(g);
       return '<div class="gcard" data-g="' + g.id + '"><div class="grow">' +
-        '<input type="text" aria-label="Group name" data-f="name" value="' + esc(g.name) + '" placeholder="Group name">' +
-        '<input class="glink" type="url" aria-label="Group link" data-f="link" value="' + esc(g.link) + '" placeholder="https://www.skool.com/...">' +
+        '<input type="text" aria-label="Name" data-f="name" value="' + esc(g.name) + '" placeholder="' + (g.mine ? "My community's name" : "Group name") + '">' +
+        '<input class="glink" type="url" aria-label="Link" data-f="link" value="' + esc(g.link) + '" placeholder="https://www.skool.com/...">' +
         '<button class="btn small danger" type="button" data-gdel>Remove</button></div>' +
-        '<div class="gdays" role="group" aria-label="What kind of group"><span class="gdl">This is</span>' +
-        '<button type="button" class="dchip' + (g.mine ? "" : " on") + '" data-gmine="0" aria-pressed="' + !g.mine + '">A promo group</button>' +
-        '<button type="button" class="dchip' + (g.mine ? " on" : "") + '" data-gmine="1" aria-pressed="' + !!g.mine + '">My community</button></div>' +
-        (g.mine ? '<p class="mine-note">Any post you set for this community shows it here, on any day. No limits to track.</p></div>' : "") +
-        (g.mine ? "" : '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
+        (g.mine ? "" :
+        '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
         DAYS.map(function (d, i) { return '<button type="button" class="dchip' + (days.indexOf(i) !== -1 ? " on" : "") + '" data-gday="' + i + '" aria-pressed="' + (days.indexOf(i) !== -1) + '">' + d.slice(0, 3) + "</button>"; }).join("") +
         "</div>" +
         '<div class="gdays" role="group" aria-label="Posts a day"><span class="gdl">Posts a day</span>' +
         [[1, "1"], [2, "2"], [0, "Unlimited"]].map(function (o) { return '<button type="button" class="dchip' + (gLimit(g) === o[0] ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + (gLimit(g) === o[0]) + '">' + o[1] + "</button>"; }).join("") +
-        "</div></div>");
-    }).join("") : '<p class="hint">No groups yet. Add the communities you promote in.</p>';
+        "</div>") + "</div>";
+    }
+    var pg = promoGroups(), mg = mineGroups();
+    $("gList").innerHTML = pg.length ? pg.map(card).join("") : '<p class="hint">No promo groups yet. Add the groups where you share your offers.</p>';
+    $("cList").innerHTML = mg.length ? mg.map(card).join("") : '<p class="hint">None yet.</p>';
   }
-  $("gList").addEventListener("input", function (e) {
+  $("cAdd").addEventListener("click", function () {
+    S.groups.push({ id: uid(), name: "", link: "", mine: true }); save(); renderGroups();
+    var ins = $("cList").querySelectorAll('[data-f="name"]'); ins[ins.length - 1].focus();
+  });
+  $("grpWrap").addEventListener("input", function (e) {
     var row = e.target.closest("[data-g]"); if (!row) return;
     var g = S.groups.find(function (x) { return x.id === row.getAttribute("data-g"); });
     g[e.target.getAttribute("data-f")] = e.target.value.trim(); save();
   });
-  $("gList").addEventListener("click", function (e) {
+  $("grpWrap").addEventListener("click", function (e) {
     var mc = e.target.closest("[data-gmine]");
     if (mc) {
       var gm = S.groups.find(function (x) { return x.id === mc.closest("[data-g]").getAttribute("data-g"); });
@@ -1097,6 +1256,67 @@
     var b = e.target.closest("[data-gdel]"); if (!b) return;
     var id = b.closest("[data-g]").getAttribute("data-g");
     arm(b, "Remove", "Tap again", function () { S.groups = S.groups.filter(function (x) { return x.id !== id; }); save(); renderGroups(); });
+  });
+  function favOf(p) { return p ? (S.favs || []).find(function (x) { return x.src === p.id; }) : null; }
+  function mergeFavs(mine, theirs) {
+    var out = (mine || []).slice();
+    (theirs || []).forEach(function (t) { if (!out.some(function (x) { return x.id === t.id; })) out.push(t); });
+    return out;
+  }
+  function renderFavs() {
+    var fs = S.favs || [];
+    $("favList").innerHTML = fs.length ? fs.map(function (x) {
+      var when = new Date(x.savedAt || Date.now()).toLocaleDateString([], { month: "short", day: "numeric" });
+      return '<div class="fav" data-fav="' + x.id + '">' +
+        (x.img ? '<img class="thumb" alt="" src="' + esc(x.img) + '">' : "") +
+        '<div class="ft">' + esc(x.title || "Untitled post") + "</div>" +
+        '<div class="fb">' + esc(toPlain(x.body || "")) + "</div>" +
+        '<div class="fm">' + esc(forLabel(validFor(x.for) ? x.for : "promo")) + " \u00b7 saved " + when + "</div>" +
+        '<div class="row"><select data-fday aria-label="Which day">' + dayOptions(todayIdx()) + '</select><button class="btn primary small" type="button" data-fuse>Use again</button></div>' +
+        '<div class="row"><button class="btn small" type="button" data-fcopy>Copy post</button><button class="btn small danger" type="button" data-fdel>Remove</button></div>' +
+        "</div>";
+    }).join("") : '<div class="empty-day"><p>No favorites yet.</p><p class="hint" style="margin:0">When a post does well, open it on its day and tap &#9734; Add to favorites.</p></div>';
+  }
+  $("favList").addEventListener("click", function (e) {
+    var card = e.target.closest("[data-fav]"); if (!card) return;
+    var x = S.favs.find(function (f) { return f.id === card.getAttribute("data-fav"); }); if (!x) return;
+    if (e.target.closest("[data-fuse]")) {
+      var d = +card.querySelector("[data-fday]").value;
+      var np = { id: uid(), day: d, for: validFor(x.for) ? x.for : "promo", title: x.title, body: x.body, img: x.img || "", imgPrompt: x.imgPrompt || "", posted: {} };
+      S.posts.push(np);
+      if (!save()) { np.img = ""; save(); }
+      curPost[d] = np.id; toast("Added to " + DAYS[d]); go(slug(d));
+    }
+    if (e.target.closest("[data-fcopy]")) copyPost(x.body || "");
+    var del = e.target.closest("[data-fdel]");
+    if (del) arm(del, "Remove", "Tap again to remove", function () { S.favs = S.favs.filter(function (f) { return f !== x; }); save(); renderFavs(); toast("Removed from favorites"); });
+  });
+  function renderOffers() {
+    var o = S.offers || [];
+    $("oList").innerHTML = o.length ? o.map(function (x) {
+      return '<div class="gcard" data-o="' + x.id + '"><div class="grow">' +
+        '<input type="text" aria-label="Offer name" data-of="name" value="' + esc(x.name) + '" placeholder="Offer name, like 1:1 Reiki Session">' +
+        '<input class="glink" type="url" aria-label="Offer link" data-of="link" value="' + esc(x.link) + '" placeholder="https://... (where people buy or book)">' +
+        '<button class="btn small danger" type="button" data-odel>Remove</button></div></div>';
+    }).join("") : '<p class="hint">No offers yet. Add the things you promote, like a session, a course or a product.</p>';
+  }
+  $("oList").addEventListener("input", function (e) {
+    var row = e.target.closest("[data-o]"); if (!row) return;
+    var o = S.offers.find(function (x) { return x.id === row.getAttribute("data-o"); });
+    o[e.target.getAttribute("data-of")] = e.target.value.trim(); save();
+  });
+  $("oList").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-odel]"); if (!b) return;
+    var id = b.closest("[data-o]").getAttribute("data-o");
+    arm(b, "Remove", "Tap again", function () {
+      S.offers = S.offers.filter(function (x) { return x.id !== id; });
+      S.posts.forEach(function (p) { if (p.for === id) p.for = "promo"; });
+      save(); renderOffers();
+    });
+  });
+  $("oAdd").addEventListener("click", function () {
+    S.offers.push({ id: "o" + uid(), name: "", link: "" }); save(); renderOffers();
+    var ins = $("oList").querySelectorAll('[data-of="name"]'); ins[ins.length - 1].focus();
   });
   $("gAdd").addEventListener("click", function () {
     S.groups.push({ id: uid(), name: "", link: "", days: [0, 1, 2, 3, 4, 5, 6], limit: 1 }); save(); renderGroups();
