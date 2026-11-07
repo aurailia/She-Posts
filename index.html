@@ -200,6 +200,7 @@
   .choice.col .choice-txt { flex: none; }
   .choice-txt { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
   .choice-txt span { font-size: 15px; color: var(--muted); }
+  #filePanel, #savePanel { scroll-margin-top: 96px; }
   .mine-note { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
   .ptab .pn { font-size: 12px; font-weight: 700; opacity: .85; margin-left: 4px; }
   .tick.full { opacity: .5; cursor: not-allowed; }
@@ -864,6 +865,7 @@
       var n = data.posts.length, when = data.savedAt ? new Date(data.savedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
       $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". Choose what to bring over.";
       $("savePanel").hidden = true; $("filePanel").hidden = false;
+      $("filePanel").scrollIntoView({ block: "start" });
     };
     r.onerror = function () { toast("Couldn't open that file. Try again."); };
     r.readAsText(file);
@@ -886,6 +888,8 @@
     if (added) bits.push("added " + added + (added === 1 ? " new post" : " new posts"));
     if (matched) bits.push("updated " + matched);
     if (newFavs) bits.push(newFavs + (newFavs === 1 ? " new favorite" : " new favorites"));
+    S.fileSavedAt = Date.now(); S.updatedAt = S.fileSavedAt; save(true); markDirty();
+    window.scrollTo(0, 0);
     toast(bits.length ? "Done: " + bits.join(", ") : "Everything was already up to date");
   });
   $("fileGo").addEventListener("click", function () {
@@ -897,7 +901,7 @@
       S.groups = pending.groups || S.groups; S.offers = pending.offers || S.offers; S.favs = pending.favs || S.favs; S.build = Object.assign({}, SEED.build, pending.build || {}); S.show = pending.show || "all";
       if (!save()) { S = JSON.parse(before); toast("This device ran out of room for all the images. Remove a few images and save the file again."); return; }
       S.fileSavedAt = Date.now(); S.updatedAt = S.fileSavedAt; save(true);
-      pending = null; $("filePanel").hidden = true; renderWeek(); toast("Your week is here");
+      pending = null; $("filePanel").hidden = true; renderWeek(); window.scrollTo(0, 0); toast("Your week is here");
     });
   });
   $("clearWeek").addEventListener("click", function () {
