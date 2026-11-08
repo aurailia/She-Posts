@@ -519,7 +519,7 @@
     setTimeout(markDirty, 0);
     queueCloud();
     try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
-    catch (e) { if (cloud) return true; toast("Storage is full. Remove an image or clear the week, then try again."); return false; }
+    catch (e) { if (cloud) return true; toast("This device is out of room. Remove a few images or clear the week, then try again."); return false; }
   }
 
   /* ---------- move my week between devices ---------- */
@@ -564,7 +564,7 @@
   var cloud = null, assets = null, cloudTimer = null, writing = false, again = false;
   function cloudState() {
     var c = JSON.parse(JSON.stringify(S));
-    c.posts.forEach(function (p) { if (p.img && p.img.indexOf("data:") === 0) p.img = ""; });
+    c.posts.forEach(function (p) { if (p.img && (p.img.indexOf("data:") === 0 || isRef(p.img))) p.img = ""; });
     return c;
   }
   function queueCloud() {
@@ -580,7 +580,75 @@
     }).then(function () { writing = false; if (again) { again = false; pushCloud(); } });
   }
   function badge(on) { var b = $("syncBadge"); b.textContent = on ? "Synced" : "Saved on this device"; b.classList.toggle("on", !!on); }
-  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : (p.img || ""); }
+  /* Images live in the browser's image store, which has far more room than regular storage.
+     A post keeps a short "idb:" reference to its image. */
+  var IDB = null, IMG_URL = {}, IMG_DATA = {}, IMG_BLOB = {};
+  function isRef(v) { return typeof v === "string" && v.indexOf("idb:") === 0; }
+  function refSrc(v) { return isRef(v) ? (IMG_URL[v.slice(4)] || "") : (v || ""); }
+  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : refSrc(p.img); }
+  function idbOpen() {
+    return new Promise(function (res) {
+      try {
+        var r = indexedDB.open("she-posts-images", 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore("imgs"); };
+        r.onsuccess = function () { IDB = r.result; res(IDB); };
+        r.onerror = function () { res(null); };
+        r.onblocked = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+  }
+  function idbTx(mode, fn) {
+    return new Promise(function (res, rej) {
+      if (!IDB) { rej(new Error("no store")); return; }
+      try { var t = IDB.transaction("imgs", mode), st = t.objectStore("imgs"), out = fn(st); t.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); }; t.onerror = t.onabort = function () { rej(t.error); }; }
+      catch (e) { rej(e); }
+    });
+  }
+  function remember(key, blob, dataUrl) {
+    IMG_BLOB[key] = blob;
+    if (!IMG_URL[key]) IMG_URL[key] = URL.createObjectURL(blob);
+    if (dataUrl) IMG_DATA[key] = dataUrl;
+    else { var fr = new FileReader(); fr.onload = function () { IMG_DATA[key] = fr.result; }; fr.readAsDataURL(blob); }
+  }
+  var dataToRef = {};
+  function storeImage(dataUrl) {
+    if (dataToRef[dataUrl]) return Promise.resolve(dataToRef[dataUrl]);
+    var key = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), blob = dataUrlToBlob(dataUrl);
+    return idbTx("readwrite", function (st) { st.put(blob, key); }).then(function () { remember(key, blob, dataUrl); dataToRef[dataUrl] = "idb:" + key; return "idb:" + key; });
+  }
+  function inlineImg(v) { return isRef(v) ? (IMG_DATA[v.slice(4)] || "") : (v || ""); }
+  function internalize(list) {
+    var jobs = [];
+    (list || []).forEach(function (o) {
+      if (o && typeof o.img === "string" && o.img.indexOf("data:") === 0) jobs.push(storeImage(o.img).then(function (ref) { o.img = ref; }, function () {}));
+    });
+    return Promise.all(jobs);
+  }
+  function cleanupImages() {
+    if (!IDB) return;
+    var used = {};
+    S.posts.concat(S.favs || []).forEach(function (o) { if (isRef(o.img)) used[o.img.slice(4)] = 1; });
+    Object.keys(IMG_BLOB).forEach(function (k) {
+      if (used[k]) return;
+      idbTx("readwrite", function (st) { st.delete(k); }).catch(function () {});
+      try { URL.revokeObjectURL(IMG_URL[k]); } catch (e) {}
+      delete IMG_URL[k]; delete IMG_DATA[k]; delete IMG_BLOB[k];
+    });
+  }
+  function initImages() {
+    return idbOpen().then(function (db) {
+      if (!db) return;
+      return new Promise(function (res) {
+        try {
+          var t = db.transaction("imgs", "readonly"), c = t.objectStore("imgs").openCursor();
+          c.onsuccess = function () { var cur = c.result; if (cur) { remember(cur.key, cur.value); cur.continue(); } };
+          t.oncomplete = res; t.onerror = t.onabort = res;
+        } catch (e) { res(); }
+      }).then(function () {
+        return internalize(S.posts.concat(S.favs || []));
+      }).then(function () { save(true); cleanupImages(); });
+    }).then(function () { route(true); }, function () {});
+  }
   function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); }
   function dataUrlToBlob(u) {
     var parts = u.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
@@ -590,10 +658,10 @@
   var migrating = false;
   function migrateImages() {
     if (!assets || migrating) return;
-    var p = S.posts.find(function (x) { return x.img && x.img.indexOf("data:") === 0 && !x.imgId; });
+    var p = S.posts.find(function (x) { return x.img && (x.img.indexOf("data:") === 0 || (isRef(x.img) && IMG_BLOB[x.img.slice(4)])) && !x.imgId; });
     if (!p) return;
     migrating = true;
-    assets.upload(dataUrlToBlob(p.img)).then(function (a) { p.imgId = a.id; p.img = ""; save(); }, function () {}).then(function () { migrating = false; migrateImages(); });
+    assets.upload(isRef(p.img) ? IMG_BLOB[p.img.slice(4)] : dataUrlToBlob(p.img)).then(function (a) { p.imgId = a.id; p.img = ""; save(); }, function () {}).then(function () { migrating = false; migrateImages(); });
   }
 
   var toastT;
@@ -723,7 +791,8 @@
           function () { var old = p.img; p.img = data; if (!save()) p.img = old; renderDay(curDay); });
         return;
       }
-      var old = p.img; p.img = data; if (!save()) { p.img = old; } renderDay(curDay);
+      storeImage(data).then(function (ref) { p.img = ref; save(); renderDay(curDay); },
+        function () { var old = p.img; p.img = data; if (!save()) { p.img = old; } renderDay(curDay); });
     });
     picker.value = "";
   });
@@ -834,7 +903,8 @@
   });
   $("saveClose").addEventListener("click", function () { $("savePanel").hidden = true; });
   $("saveNow").addEventListener("click", function () {
-    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts, groups: S.groups, offers: S.offers, favs: S.favs, build: S.build, show: S.show || "all" };
+    var inl = function (o) { return Object.assign({}, o, { img: inlineImg(o.img) }); };
+    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts.map(inl), groups: S.groups, offers: S.offers, favs: (S.favs || []).map(inl), build: S.build, show: S.show || "all" };
     var text = JSON.stringify(data), name = "she-posts-" + stamp() + ".json";
     var file = null, canShareFile = false;
     if (touchDevice() && navigator.share && navigator.canShare) {
@@ -862,11 +932,13 @@
     r.onload = function () {
       var data = null; try { data = JSON.parse(r.result); } catch (e) {}
       if (!data || data.app !== "she-posts" || !Array.isArray(data.posts)) { toast("That isn't a She Posts file. Pick the one you saved."); return; }
+      internalize(data.posts.concat(data.favs || [])).then(function () {
       pending = data;
       var n = data.posts.length, when = data.savedAt ? new Date(data.savedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
       $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". Choose what to bring over.";
       $("savePanel").hidden = true; $("filePanel").hidden = false;
       $("filePanel").scrollIntoView({ block: "start" });
+      });
     };
     r.onerror = function () { toast("Couldn't open that file. Try again."); };
     r.readAsText(file);
@@ -906,7 +978,7 @@
     });
   });
   $("clearWeek").addEventListener("click", function () {
-    arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); renderWeek(); toast("Your week is clear"); });
+    arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); cleanupImages(); renderWeek(); toast("Your week is clear"); });
   });
 
   /* fit the box to the text. While typing it only grows, so the page never jumps. */
@@ -1115,7 +1187,7 @@
     }
     if (act === "img-save") saveImage(p);
     if (act === "img-copy") copyImage(p);
-    if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
+    if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); cleanupImages(); renderDay(curDay); }
     if (act === "delete") arm(a, "Delete this post", "Tap again to delete", function () { S.posts = S.posts.filter(function (x) { return x.id !== p.id; }); delete curPost[curDay]; save(); toast("Post deleted"); renderDay(curDay); });
   });
 
@@ -1303,7 +1375,7 @@
     $("favList").innerHTML = fs.length ? fs.map(function (x) {
       var when = new Date(x.savedAt || Date.now()).toLocaleDateString([], { month: "short", day: "numeric" });
       return '<div class="fav" data-fav="' + x.id + '">' +
-        (x.img ? '<img class="thumb" alt="" src="' + esc(x.img) + '">' : "") +
+        (refSrc(x.img) ? '<img class="thumb" alt="" src="' + esc(refSrc(x.img)) + '">' : "") +
         '<div class="ft">' + esc(x.title || "Untitled post") + "</div>" +
         '<div class="fb">' + esc(toPlain(x.body || "")) + "</div>" +
         '<div class="fm">' + esc(forLabel(validFor(x.for) ? x.for : "promo")) + " \u00b7 saved " + when + "</div>" +
@@ -1360,6 +1432,7 @@
 
   load();
   route();
+  initImages();
 })();
 </script>
 </body>
