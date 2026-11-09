@@ -130,11 +130,14 @@
   .skool .stitle {
     width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-weight: 700; font-size: 22px; line-height: 1.3; padding: 4px 6px; margin: 0 -6px 4px; border-radius: 8px;
   }
-  .skool textarea.sbody {
-    width: 100%; border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-size: 17px; line-height: 1.6; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; resize: none; overflow: hidden; min-height: 80px;
+  .skool .sbody {
+    width: calc(100% + 12px); border: 1px solid transparent; background: transparent; color: var(--skool-fg); font: inherit; font-size: 17px; line-height: 1.6; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; min-height: 80px;
+    white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
   }
-  .skool .stitle:hover, .skool textarea.sbody:hover { border-color: var(--skool-line); }
-  .skool .stitle:focus, .skool textarea.sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
+  .skool .sbody:empty::before { content: attr(data-ph); color: var(--skool-muted); }
+  .skool .sbody a { color: #2f6fde; text-decoration: underline; }
+  .skool .stitle:hover, .skool .sbody:hover { border-color: var(--skool-line); }
+  .skool .stitle:focus, .skool .sbody:focus { outline: none; border-color: var(--gold); background: #fffaf0; }
   .skool .simg { margin-top: 12px; border-radius: 10px; overflow: hidden; border: 1px solid var(--skool-line); }
   .skool .simg { aspect-ratio: 1 / 1; max-width: 100%; background: #f4f1f3; }
   .skool .simg img { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
@@ -414,7 +417,7 @@
     <div id="grpWrap">
       <div class="gsec">
         <h2>&#128227; Where I promote</h2>
-        <p class="hint gsub">Promo groups you post in. Tap the days they allow and how many posts a day.</p>
+        <p class="hint gsub">Promo groups you post in. Pick your level in each one, then tap the days you can post and how many posts a day.</p>
         <div class="panel">
           <div class="glist" id="gList"></div>
           <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a promo group</button></div>
@@ -519,7 +522,7 @@
     setTimeout(markDirty, 0);
     queueCloud();
     try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
-    catch (e) { if (cloud) return true; toast("This device is out of room. Remove a few images or clear the week, then try again."); return false; }
+    catch (e) { if (cloud) return true; toast("Storage is full. Remove an image or clear the week, then try again."); return false; }
   }
 
   /* ---------- move my week between devices ---------- */
@@ -564,7 +567,7 @@
   var cloud = null, assets = null, cloudTimer = null, writing = false, again = false;
   function cloudState() {
     var c = JSON.parse(JSON.stringify(S));
-    c.posts.forEach(function (p) { if (p.img && (p.img.indexOf("data:") === 0 || isRef(p.img))) p.img = ""; });
+    c.posts.forEach(function (p) { if (p.img && p.img.indexOf("data:") === 0) p.img = ""; });
     return c;
   }
   function queueCloud() {
@@ -580,75 +583,7 @@
     }).then(function () { writing = false; if (again) { again = false; pushCloud(); } });
   }
   function badge(on) { var b = $("syncBadge"); b.textContent = on ? "Synced" : "Saved on this device"; b.classList.toggle("on", !!on); }
-  /* Images live in the browser's image store, which has far more room than regular storage.
-     A post keeps a short "idb:" reference to its image. */
-  var IDB = null, IMG_URL = {}, IMG_DATA = {}, IMG_BLOB = {};
-  function isRef(v) { return typeof v === "string" && v.indexOf("idb:") === 0; }
-  function refSrc(v) { return isRef(v) ? (IMG_URL[v.slice(4)] || "") : (v || ""); }
-  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : refSrc(p.img); }
-  function idbOpen() {
-    return new Promise(function (res) {
-      try {
-        var r = indexedDB.open("she-posts-images", 1);
-        r.onupgradeneeded = function () { r.result.createObjectStore("imgs"); };
-        r.onsuccess = function () { IDB = r.result; res(IDB); };
-        r.onerror = function () { res(null); };
-        r.onblocked = function () { res(null); };
-      } catch (e) { res(null); }
-    });
-  }
-  function idbTx(mode, fn) {
-    return new Promise(function (res, rej) {
-      if (!IDB) { rej(new Error("no store")); return; }
-      try { var t = IDB.transaction("imgs", mode), st = t.objectStore("imgs"), out = fn(st); t.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); }; t.onerror = t.onabort = function () { rej(t.error); }; }
-      catch (e) { rej(e); }
-    });
-  }
-  function remember(key, blob, dataUrl) {
-    IMG_BLOB[key] = blob;
-    if (!IMG_URL[key]) IMG_URL[key] = URL.createObjectURL(blob);
-    if (dataUrl) IMG_DATA[key] = dataUrl;
-    else { var fr = new FileReader(); fr.onload = function () { IMG_DATA[key] = fr.result; }; fr.readAsDataURL(blob); }
-  }
-  var dataToRef = {};
-  function storeImage(dataUrl) {
-    if (dataToRef[dataUrl]) return Promise.resolve(dataToRef[dataUrl]);
-    var key = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), blob = dataUrlToBlob(dataUrl);
-    return idbTx("readwrite", function (st) { st.put(blob, key); }).then(function () { remember(key, blob, dataUrl); dataToRef[dataUrl] = "idb:" + key; return "idb:" + key; });
-  }
-  function inlineImg(v) { return isRef(v) ? (IMG_DATA[v.slice(4)] || "") : (v || ""); }
-  function internalize(list) {
-    var jobs = [];
-    (list || []).forEach(function (o) {
-      if (o && typeof o.img === "string" && o.img.indexOf("data:") === 0) jobs.push(storeImage(o.img).then(function (ref) { o.img = ref; }, function () {}));
-    });
-    return Promise.all(jobs);
-  }
-  function cleanupImages() {
-    if (!IDB) return;
-    var used = {};
-    S.posts.concat(S.favs || []).forEach(function (o) { if (isRef(o.img)) used[o.img.slice(4)] = 1; });
-    Object.keys(IMG_BLOB).forEach(function (k) {
-      if (used[k]) return;
-      idbTx("readwrite", function (st) { st.delete(k); }).catch(function () {});
-      try { URL.revokeObjectURL(IMG_URL[k]); } catch (e) {}
-      delete IMG_URL[k]; delete IMG_DATA[k]; delete IMG_BLOB[k];
-    });
-  }
-  function initImages() {
-    return idbOpen().then(function (db) {
-      if (!db) return;
-      return new Promise(function (res) {
-        try {
-          var t = db.transaction("imgs", "readonly"), c = t.objectStore("imgs").openCursor();
-          c.onsuccess = function () { var cur = c.result; if (cur) { remember(cur.key, cur.value); cur.continue(); } };
-          t.oncomplete = res; t.onerror = t.onabort = res;
-        } catch (e) { res(); }
-      }).then(function () {
-        return internalize(S.posts.concat(S.favs || []));
-      }).then(function () { save(true); cleanupImages(); });
-    }).then(function () { route(true); }, function () {});
-  }
+  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : (p.img || ""); }
   function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); }
   function dataUrlToBlob(u) {
     var parts = u.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
@@ -658,10 +593,10 @@
   var migrating = false;
   function migrateImages() {
     if (!assets || migrating) return;
-    var p = S.posts.find(function (x) { return x.img && (x.img.indexOf("data:") === 0 || (isRef(x.img) && IMG_BLOB[x.img.slice(4)])) && !x.imgId; });
+    var p = S.posts.find(function (x) { return x.img && x.img.indexOf("data:") === 0 && !x.imgId; });
     if (!p) return;
     migrating = true;
-    assets.upload(isRef(p.img) ? IMG_BLOB[p.img.slice(4)] : dataUrlToBlob(p.img)).then(function (a) { p.imgId = a.id; p.img = ""; save(); }, function () {}).then(function () { migrating = false; migrateImages(); });
+    assets.upload(dataUrlToBlob(p.img)).then(function (a) { p.imgId = a.id; p.img = ""; save(); }, function () {}).then(function () { migrating = false; migrateImages(); });
   }
 
   var toastT;
@@ -683,6 +618,7 @@
     setTimeout(function () { if (btn.classList.contains("armed")) { btn.classList.remove("armed"); btn.textContent = label; } }, 3500);
   }
 
+  var LEVELS = { free: "Free", premium: "Premium", vip: "VIP" };
   function gDays(g) { return Array.isArray(g.days) ? g.days : [0, 1, 2, 3, 4, 5, 6]; }
   function gLimit(g) { return g.limit === 0 ? 0 : (g.limit || 1); }
   function usedOn(g, d) { return postsFor(d).filter(function (p) { return p.posted && p.posted[g.id]; }).length; }
@@ -791,8 +727,7 @@
           function () { var old = p.img; p.img = data; if (!save()) p.img = old; renderDay(curDay); });
         return;
       }
-      storeImage(data).then(function (ref) { p.img = ref; save(); renderDay(curDay); },
-        function () { var old = p.img; p.img = data; if (!save()) { p.img = old; } renderDay(curDay); });
+      var old = p.img; p.img = data; if (!save()) { p.img = old; } renderDay(curDay);
     });
     picker.value = "";
   });
@@ -903,8 +838,7 @@
   });
   $("saveClose").addEventListener("click", function () { $("savePanel").hidden = true; });
   $("saveNow").addEventListener("click", function () {
-    var inl = function (o) { return Object.assign({}, o, { img: inlineImg(o.img) }); };
-    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts.map(inl), groups: S.groups, offers: S.offers, favs: (S.favs || []).map(inl), build: S.build, show: S.show || "all" };
+    var data = { app: "she-posts", v: 1, savedAt: Date.now(), posts: S.posts, groups: S.groups, offers: S.offers, favs: S.favs, build: S.build, show: S.show || "all" };
     var text = JSON.stringify(data), name = "she-posts-" + stamp() + ".json";
     var file = null, canShareFile = false;
     if (touchDevice() && navigator.share && navigator.canShare) {
@@ -932,13 +866,11 @@
     r.onload = function () {
       var data = null; try { data = JSON.parse(r.result); } catch (e) {}
       if (!data || data.app !== "she-posts" || !Array.isArray(data.posts)) { toast("That isn't a She Posts file. Pick the one you saved."); return; }
-      internalize(data.posts.concat(data.favs || [])).then(function () {
       pending = data;
       var n = data.posts.length, when = data.savedAt ? new Date(data.savedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
       $("fileInfo").textContent = "Found " + n + (n === 1 ? " post" : " posts") + (when ? ", saved " + when : "") + ". Choose what to bring over.";
       $("savePanel").hidden = true; $("filePanel").hidden = false;
       $("filePanel").scrollIntoView({ block: "start" });
-      });
     };
     r.onerror = function () { toast("Couldn't open that file. Try again."); };
     r.readAsText(file);
@@ -978,7 +910,7 @@
     });
   });
   $("clearWeek").addEventListener("click", function () {
-    arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); cleanupImages(); renderWeek(); toast("Your week is clear"); });
+    arm(this, "Clear the week", "Tap again to clear every post", function () { S.posts = []; save(); renderWeek(); toast("Your week is clear"); });
   });
 
   /* fit the box to the text. While typing it only grows, so the page never jumps. */
@@ -1011,10 +943,10 @@
         '<div class="fmt" role="toolbar" aria-label="Text style"><button type="button" class="fbtn" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" class="fbtn" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" class="fbtn" data-fmt="bolditalic" title="Bold italic"><b><i>B</i></b></button><button type="button" class="fbtn" data-fmt="plain" title="Plain text">Aa</button><button type="button" class="fbtn" data-fmt="link" title="Add a link">&#128279; Link</button><span class="fhint">Select words, then tap a style</span></div>' +
         '<div class="linkbar" id="linkBar" hidden><label for="linkUrl" class="sr">Link address</label><input id="linkUrl" type="url" placeholder="Paste the link, like https://www.skool.com/..."><button type="button" class="fbtn" data-act="link-add">Add link</button><button type="button" class="fbtn" data-act="link-cancel">Cancel</button></div>' +
         '<label class="sr" for="sTitle">Title</label><textarea class="stitle" id="sTitle" rows="1" placeholder="Add a title">' + esc(cur.title) + '</textarea>' +
-        '<label class="sr" for="sBody">Post</label><textarea class="sbody" id="sBody" placeholder="Write your post">' + esc(cur.body) + "</textarea>" +
+        '<div class="sbody" id="sBody" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Post" data-ph="Write your post" spellcheck="true">' + bodyHtml(cur.body) + "</div>" +
         (imgSrc(cur) ? '<div class="simg"><img alt="Post image" src="' + esc(imgSrc(cur)) + '"></div>' : '<div class="noimg" data-act="img" role="button" tabindex="0">&#128247; Add an image</div>') +
         '<div class="foot"><span>&#128077; Like</span><span>&#128172; Comment</span></div></div>' +
-        '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type. Links show as [words](link) here and become real links when you copy the post.</p>' +
+        '<p class="edit-tip">Tap the title or the post to edit. Changes save as you type. To add a link, select the words and paste the link right over them, or tap Link. The words stay the same and the link comes with them when you copy the post. To remove a link, tap inside it and tap Link.</p>' +
       '</div><div class="side">' +
         '<div class="panel"><label for="pFor" class="label">This post is for</label><select id="pFor">' + forOptions(cf) + "</select>" +
           (mineGroups().length || (S.offers || []).length ? "" : '<p class="hint" style="margin:8px 0 0">Add your offers or your own community in <a href="#groups" style="color:var(--gold)">Groups &amp; offers</a> and they show up here.</p>') + "</div>" +
@@ -1031,7 +963,7 @@
           (today.length ? '<div class="glist">' + today.map(function (g) {
             var lim = g.mine ? 0 : gLimit(g), used = usedOn(g, d), mine = !!cur.posted[g.id], full = lim && used >= lim && !mine;
             return '<div class="gitem"><span class="gname">' + (g.link ? '<a href="' + esc(g.link) + '" target="_blank" rel="noopener">' + esc(g.name) + " &#8599;</a>" : esc(g.name)) +
-              '<span class="glim">' + (g.mine ? "My community" : lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span>" +
+              '<span class="glim">' + (g.mine ? "My community" : LEVELS[g.level || "free"] + " \u00b7 ") + (g.mine ? "" : lim ? used + " of " + lim + " posted today" : "Unlimited, " + used + " posted today") + "</span>" +
               (function () { var vs = []; ps.forEach(function (pp, ii) { if (pp.posted && pp.posted[g.id]) vs.push(ii + 1); }); return vs.length ? '<span class="gvers">' + vs.map(function (n) { return '<span class="vtag' + (ps[n - 1].id === cur.id ? " me" : "") + '">Post ' + n + "</span>"; }).join("") + "</span>" : ""; })() +
               "</span>" +
               '<button class="tick' + (mine ? " on" : "") + (full ? " full" : "") + '" type="button" data-tick="' + g.id + '"' + (full ? " disabled" : "") + ">" + (mine ? "\u2713 Post " + (ps.indexOf(cur) + 1) + " posted" : full ? "Full today" : "Mark Post " + (ps.indexOf(cur) + 1) + " posted") + "</button></div>";
@@ -1041,7 +973,7 @@
         '<div class="panel"><div class="row"><label for="moveDay" class="label" style="margin:0">Move to</label><select id="moveDay" style="width:auto">' + dayOptions(d) + "</select></div>" +
           '<div class="row"><button class="btn small danger" type="button" data-act="delete">Delete this post</button></div></div>' +
       "</div></div>";
-    grow($("sTitle"), true); grow($("sBody"), true);
+    grow($("sTitle"), true);
   }
   /* ---------- bold and italic with Unicode letters, so they paste into Skool ---------- */
   var STY = { bold: [0x1D5D4, 0x1D5EE, 0x1D7EC], italic: [0x1D608, 0x1D622, null], bolditalic: [0x1D63C, 0x1D656, null] };
@@ -1067,17 +999,77 @@
       return ch;
     }).join("");
   }
+  /* ---------- the post editor: links show as real links, stored as [words](link) ---------- */
+  function bodyHtml(s) {
+    return esc(s || "").replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, function (m, w, u) { return '<a href="' + u + '">' + w + "</a>"; }).replace(/\n/g, "<br>");
+  }
+  function serBody(root) {
+    var out = "";
+    function walk(node) {
+      Array.prototype.forEach.call(node.childNodes, function (n) {
+        if (n.nodeType === 3) { out += n.data.replace(/\u00a0/g, " "); return; }
+        if (n.nodeType !== 1) return;
+        var tag = n.nodeName;
+        if (tag === "BR") { out += "\n"; return; }
+        if (tag === "A") {
+          var href = n.getAttribute("href") || "", txt = n.textContent.replace(/[\[\]]/g, "");
+          out += /^https?:\/\//i.test(href) && txt ? "[" + txt + "](" + href + ")" : n.textContent; return;
+        }
+        if (tag === "DIV" || tag === "P") {
+          if (out && out.slice(-1) !== "\n") out += "\n";
+          var before = out.length; walk(n);
+          if (out.length === before + 1 && out.slice(-1) === "\n") out = out.slice(0, -1);
+          out += "\n"; return;
+        }
+        walk(n);
+      });
+    }
+    walk(root);
+    return out.replace(/\n+$/, "");
+  }
+  function editorRange() {
+    var ed = $("sBody"), sel = window.getSelection();
+    if (!ed || !sel || !sel.rangeCount) return null;
+    var r = sel.getRangeAt(0);
+    return ed.contains(r.commonAncestorContainer) ? r : null;
+  }
+  function linkIn(r) { var n = r && r.commonAncestorContainer; while (n && n.id !== "sBody") { if (n.nodeName === "A") return n; n = n.parentNode; } return null; }
+  function asUrl(t) {
+    t = String(t || "").trim();
+    if (/\s/.test(t) || !t) return "";
+    if (/^https?:\/\/\S+$/i.test(t)) return t;
+    if (/^(www\.)?[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/\S*)?$/i.test(t)) return "https://" + t;
+    return "";
+  }
+  function insertPlain(t) {
+    var lines = String(t).replace(/\r/g, "").split("\n");
+    lines.forEach(function (l, i) { if (i) document.execCommand("insertLineBreak"); if (l) document.execCommand("insertText", false, l); });
+  }
+  function bodyChanged() { var ed = $("sBody"); if (ed) ed.dispatchEvent(new Event("input", { bubbles: true })); }
+  function makeLink(url) { document.execCommand("createLink", false, url); bodyChanged(); toast("Link added"); }
   var lastField = null, lastSel = [0, 0];
   document.addEventListener("selectionchange", function () {
     var a = document.activeElement;
-    if (a && (a.id === "sTitle" || a.id === "sBody")) { lastField = a.id; lastSel = [a.selectionStart, a.selectionEnd]; }
+    if (a && a.id === "sTitle") { lastField = a.id; lastSel = [a.selectionStart, a.selectionEnd]; }
+    else if (a && a.id === "sBody") lastField = "sBody";
   });
   var linkSel = null;
   function applyFmt(kind) {
     var el = lastField && $(lastField);
+    var r = editorRange();
     if (kind === "link") {
-      if (lastField !== "sBody" || lastSel[0] === lastSel[1]) { toast("Select some words in the post first"); return; }
-      linkSel = [lastSel[0], lastSel[1]]; $("linkBar").hidden = false; $("linkUrl").value = ""; $("linkUrl").focus(); return;
+      if (r && linkIn(r)) { var lk = linkIn(r), rr = document.createRange(); rr.selectNodeContents(lk); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rr); document.execCommand("unlink"); bodyChanged(); toast("Link removed"); return; }
+      if (!r || r.collapsed) { toast("Select some words in the post first"); return; }
+      linkSel = r.cloneRange(); $("linkBar").hidden = false; $("linkUrl").value = ""; $("linkUrl").focus(); return;
+    }
+    if (lastField === "sBody" && !r) { toast("Select some words in the post first"); return; }
+    if (lastField === "sBody" && r) {
+      if (r.collapsed) { toast("Select some words first"); return; }
+      var part = r.toString(), out2 = kind === "plain" ? toPlain(part) : (styled(part, kind) === part ? toPlain(part) : styled(part, kind));
+      var lk2 = linkIn(r), href2 = lk2 && lk2.getAttribute("href");
+      insertPlain(out2);
+      if (href2) { var s2 = window.getSelection(), rg = s2.getRangeAt(0), st = document.createRange(); try { st.setStart(rg.endContainer, Math.max(0, rg.endOffset - Array.from(out2).join("").length)); st.setEnd(rg.endContainer, rg.endOffset); s2.removeAllRanges(); s2.addRange(st); document.execCommand("createLink", false, href2); } catch (e) {} }
+      bodyChanged(); return;
     }
     if (!el || lastSel[0] === lastSel[1]) { toast("Select some words first"); return; }
     var v = el.value, a = lastSel[0], b = lastSel[1], part = v.slice(a, b);
@@ -1140,7 +1132,7 @@
   $("dayBody").addEventListener("input", function (e) {
     var p = curP(); if (!p) return;
     if (e.target.id === "sTitle") { if (/\n/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*\n+\s*/g, " "); grow(e.target, true); p.title = e.target.value; var f1 = favOf(p); if (f1) f1.title = p.title; save(); }
-    if (e.target.id === "sBody") { p.body = e.target.value; var f2 = favOf(p); if (f2) f2.body = p.body; grow(e.target); save(); }
+    if (e.target.id === "sBody") { p.body = serBody(e.target); var f2 = favOf(p); if (f2) f2.body = p.body; save(); }
   });
   $("dayBody").addEventListener("change", function (e) {
     if (e.target.id === "postSel") { curPost[curDay] = e.target.value; renderDay(curDay); return; }
@@ -1148,7 +1140,16 @@
     if (e.target.id !== "moveDay") return;
     var p = curP(); p.day = +e.target.value; save(); toast("Moved to " + DAYS[p.day]); renderDay(curDay);
   });
-  $("dayBody").addEventListener("keydown", function (e) { if (e.target.id === "sTitle" && e.key === "Enter") { e.preventDefault(); return; } if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
+  $("dayBody").addEventListener("paste", function (e) {
+    if (e.target.closest && e.target.closest("#sBody")) {
+      var cd = e.clipboardData || window.clipboardData; if (!cd) return;
+      var t = cd.getData("text/plain"); e.preventDefault();
+      var r = editorRange(), u = asUrl(t);
+      if (u && r && !r.collapsed) { makeLink(u); return; }
+      insertPlain(t); bodyChanged();
+    }
+  });
+  $("dayBody").addEventListener("keydown", function (e) { if (e.target.id === "sBody" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); document.execCommand("insertLineBreak"); bodyChanged(); return; } if (e.target.id === "sTitle" && e.key === "Enter") { e.preventDefault(); return; } if (e.target.getAttribute && e.target.getAttribute("data-act") === "img" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.click(); } });
   $("dayBody").addEventListener("mousedown", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); });
   $("dayBody").addEventListener("touchstart", function (e) { if (e.target.closest("[data-fmt]")) e.preventDefault(); }, { passive: false });
   $("dayBody").addEventListener("touchend", function (e) { var f = e.target.closest("[data-fmt]"); if (f) { e.preventDefault(); applyFmt(f.getAttribute("data-fmt")); } });
@@ -1168,10 +1169,9 @@
     if (act === "link-add") {
       var url = $("linkUrl").value.trim();
       if (!/^https?:\/\//i.test(url)) { if (/^[\w-]+\.[\w.-]+/.test(url)) url = "https://" + url; else { toast("Paste a full link, starting with https://"); return; } }
-      var el = $("sBody"), v = el.value, a = linkSel[0], b = linkSel[1], words = v.slice(a, b).replace(/[\[\]]/g, "");
-      var md = "[" + words + "](" + url + ")";
-      el.value = v.slice(0, a) + md + v.slice(b); $("linkBar").hidden = true; linkSel = null;
-      el.dispatchEvent(new Event("input", { bubbles: true })); toast("Link added");
+      var el = $("sBody"); el.focus();
+      var sl2 = window.getSelection(); sl2.removeAllRanges(); sl2.addRange(linkSel);
+      $("linkBar").hidden = true; linkSel = null; makeLink(url);
     }
     if (act === "copy-img") copy(p.imgPrompt, "Image prompt copied");
     if (act === "img") { pickFor = p.id; picker.click(); }
@@ -1187,7 +1187,7 @@
     }
     if (act === "img-save") saveImage(p);
     if (act === "img-copy") copyImage(p);
-    if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); cleanupImages(); renderDay(curDay); }
+    if (act === "img-remove") { p.img = ""; p.imgId = ""; save(); renderDay(curDay); }
     if (act === "delete") arm(a, "Delete this post", "Tap again to delete", function () { S.posts = S.posts.filter(function (x) { return x.id !== p.id; }); delete curPost[curDay]; save(); toast("Post deleted"); renderDay(curDay); });
   });
 
@@ -1215,6 +1215,7 @@
       "- The post picks up where the title leaves off. Don't repeat the title's moment in the first line.\n" +
       (MEMBER ? "" : "- If it's about the Business Alignment Blueprint, keep Human Design at the center and tie it to everyday business struggles.\n") +
       "- Don't assume the reader's clients or buyers are women.\n\n" +
+      HD_BLOCK +
       "NEVER\n" +
       "- Em dashes or en dashes. Use a period or a comma.\n" +
       "- \"You're not X, you're Y\" or \"it's not X, it's Y\".\n" +
@@ -1237,14 +1238,15 @@
     for (var i = 1; i <= n; i++) s += (n > 1 ? "VERSION " + i + "\n" : "") + "TITLE: [the title]\nPOST:\n[the post]\n" + (b.img ? "IMAGE PROMPT: [the image prompt]\n" : "") + (i < n ? "\n" : "");
     return s;
   }
-  var STYLE = "STYLE GUIDE (follow it for every version)\nIf you can see a style guide or saved example posts of mine (in a project or files I've shared), read them first and follow them too. Where they're more specific, they win. Never copy wording from the examples, only how they work.\n\nTone: witty, fun and a little playful, and it always teaches something real. It sounds like me talking to a friend over coffee. The humor comes from how true it is, like \"You've joined 14 promo groups and posted in two. I see you.\" Laugh with the reader, never at them. Every post leaves them with something they can use today. If a line could sit in anyone else's post, rewrite it until it sounds like me.\n\nWhat makes people read and buy (use the pattern, never name it):\n- Name the exact frustration they feel right now, in the words they'd use.\n- Show why it matters. Right after the hook, help them feel what's at stake with a real moment they'd recognize, not a lecture. (For a post about engagement: when nobody comments, new members decide the room is empty and quietly leave.)\n- Name the cost of leaving it as it is: hours, money, clients who never found them, the energy of posting into silence. One or two honest lines. No fear, no guilt. The cost makes them care, and the tip that follows gives relief.\n- Confess you've done it too, then a short reaction on its own line.\n- Real numbers feel true (\"rewrote it 5 times\", \"45 minutes\"). Vague words feel like marketing.\n- List real moments they'd use it, each with a matching emoji, so every reader finds themselves in one line.\n- Bust a belief they hold to stop the scroll, then give them relief.\n- Give a real tip before the pitch.\n- Make the win tiny and doable today.\n- Show how easy it is in short steps.\n- Answer the one objection that matters most before they think it.\n- Share a little of yourself: a laugh at yourself, or \"I wish I'd had this when I started.\"\n- If it's still growing, say so. It feels honest and invites them in early.\n- Lead with FREE when it's free.\n- For a deal: the regular price next to the deal price, the reason for the deal, and the fine print in one plain line. Only use prices, dates and codes I gave you.\n- Show exactly what they get in a short list.\n- If one thing is only in a paid tier, say it once with a \ud83d\udd12, no pressure.\n- One clear next step. One link.\n- Invite them to come back and share how it went.\n\nThe shape:\n- Hook: a question that names a specific frustration, a funny confession, a belief buster, or the offer name in caps as a bold headline with the hook right under it. CAPS on one or two words for punch, never more. A knowing emoji like \ud83d\ude02 is welcome.\n- Why it matters and the cost, in a few short lines.\n- Value: one tip or bit of selling psychology, then a \"Try this today\" quick win. Bold the one phrase that lands the insight.\n- Bridge to the offer by name, in Unicode bold.\n- A short list of what's inside, with one emoji as the bullet.\n- Close: a bold line that says the real problem in a new way, a bold invitation (lead with FREE if it's free), then \ud83d\udc49 and the link.\n- Very short lines and lots of white space for people skimming. Pick one signature emoji and repeat it through the post as a thread.\n- Write fresh. Never copy wording from any post you've seen.";
+  var STYLE = "STYLE GUIDE (follow it for every version)\nIf you can see a style guide or saved example posts of mine (in a project or files I've shared), read them first and follow them too. Where they're more specific, they win. Never copy wording from the examples, only how they work.\n\nTone: witty, fun and a little playful, and it always teaches something real. It sounds like me talking to a friend over coffee. The humor comes from how true it is, like \"You've joined 14 promo groups and posted in two. I see you.\" Laugh with the reader, never at them. Every post leaves them with something they can use today. If a line could sit in anyone else's post, rewrite it until it sounds like me.\n\nWhat makes people read and buy (use the pattern, never name it):\n- Name the exact frustration they feel right now, in the words they'd use.\n- Show why it matters. Right after the hook, help them feel what's at stake with a real moment they'd recognize, not a lecture. (For a post about engagement: when nobody comments, new members decide the room is empty and quietly leave.)\n- Name the cost of leaving it as it is: hours, money, clients who never found them, the energy of posting into silence. One or two honest lines. No fear, no guilt. The cost makes them care, and the tip that follows gives relief.\n- Confess you've done it too, then a short reaction on its own line.\n- Real numbers feel true (\"rewrote it 5 times\", \"45 minutes\"). Vague words feel like marketing.\n- List real moments they'd use it, each with a matching emoji, so every reader finds themselves in one line.\n- Bust a belief they hold to stop the scroll, then give them relief.\n- Give a real tip before the pitch.\n- Make the win tiny and doable today.\n- Show how easy it is in short steps.\n- Answer the one objection that matters most before they think it.\n- Share a little of yourself: a laugh at yourself, or \"I wish I'd had this when I started.\"\n- If it's still growing, say so. It feels honest and invites them in early.\n- Lead with FREE when it's free.\n- For a deal: the regular price next to the deal price, the reason for the deal, and the fine print in one plain line. Only use prices, dates and codes I gave you.\n- Show exactly what they get in a short list.\n- If one thing is only in a paid tier, say it once with a \ud83d\udd12, no pressure.\n- One clear next step. One link.\n- Invite them to come back and share how it went.\n\nTITLE AND FIRST SENTENCE (this matters most)\nIn the Skool feed, people only see the title, about the first 20 words of the post and a tiny image. That's all they see before they decide to stop or keep scrolling. The title earns the stop. The first sentence earns the click.\n- Title: names a moment they know, often as a question, like \"Wake up tired even after 8 hours of sleep? \ud83d\ude34\". Or names what waiting is costing them, like \"Every month without a website is a month of clients you never meet\". Fits on one line on a phone, about 10 words or less, one emoji.\n- First sentence: about 20 words. It picks up where the title leaves off and never repeats it. It tells them what you've got for it and gives a reason to tap, often ending with \"Here's how it works \ud83d\udc47\" or similar.\n- Never open with a greeting like \"Hey everyone, hope you're having a great week.\" Go straight to a moment they know.\n- If you name the cost, keep it honest and kind. It should make them care, not feel guilty.\n\nThe shape:\n- Hook: the title and first sentence above. CAPS on one or two words for punch, never more. A knowing emoji like \ud83d\ude02 is welcome.\n- Why it matters and the cost, in a few short lines.\n- Value: one tip or bit of selling psychology, then a \"Try this today\" quick win. Bold the one phrase that lands the insight.\n- Bridge to the offer by name, in Unicode bold.\n- A short list of what's inside, with one emoji as the bullet.\n- Close: a bold line that says the real problem in a new way, a bold invitation (lead with FREE if it's free), then \ud83d\udc49 and the link.\n- Very short lines and lots of white space for people skimming. Pick one signature emoji and repeat it through the post as a thread.\n- Write fresh. Never copy wording from any post you've seen.";
   var SHAPES = {"tip": "TIP, THEN INVITE: hook, why it matters and the cost, a 💡 bit of selling psychology, a Try this today quick win, bridge to my offer, what they get (one emoji per tier if there are tiers), a bold reframe of the problem, the invitation, 👉 link.", "peek": "COME TAKE A LOOK: a casual, funny hook, a line on why it matters, an invitation to take a look (or another look) at a resource, an Inside you'll find list, FREE called out if it's free, a personal line about why it exists and that it's still growing, a line for both new and returning readers, then a warm one-line close.", "spotlight": "SPOTLIGHT ONE THING: a belief-busting hook, why it matters and the cost, a quick tip, then make one tool or benefit the star. One line on what it is and who it's for, a ✓ checklist where each item is a bold label and one short benefit, NEW in front of anything new, tie it to the tier that gets it with a 🔒 line, then 👉 link.", "launch": "LAUNCH: a confession hook, a short me-too reaction on its own line, what it costs them now (time, stress, missed chances), a scenario list with a matching emoji per line, ✅ how it works in short steps, the launch price next to the regular price with the reason and code (only if I gave them), the fine print in one line, 👉 link, ask buyers to come back and share their stories, and end on a funny, true one-liner."};
   var SHAPE_HINTS = { auto: "Claude picks the shape that fits what you're sharing.", tip: "Teach one thing first, then invite them in. Great for your community or a paid tier.", peek: "A casual invite to a free resource, new or newly updated.", spotlight: "Make one tool or perk the star, and tie it to the tier that gets it.", launch: "A new offer or product, with a launch price if you have one." };
   function shapeBlock(k) {
     if (SHAPES[k]) return "POST SHAPE (use this one)\n" + SHAPES[k];
     return "POST SHAPE\nPick the one that fits best:\n" + Object.keys(SHAPES).map(function (x) { return "- " + SHAPES[x]; }).join("\n");
   }
-  var IMG_TEMPLATE = "Create a square 1:1 banner for a community post. It should look like it belongs with my other graphics.\n\nMATCH MY BRAND\n- Look at the banners and graphics you've made for me before, in this chat, this project or your memory of me, and match that style: my colors, fonts, decorative details, textures and overall feel.\n- If you haven't made graphics for me before, ask me to upload 2 or 3 of my banners, or tell you my brand colors and fonts, before you create it. Don't guess.\n- If my banners usually include a photo of me, ask if I want to be in this one too.\n\nTHE BANNER\n- Main text: what I'm promoting, spelled exactly, as a short invitation like \"Join [my community]\" or the name of my offer: \"[what I'm promoting]\"\n- Second line: the special from the post, word for word, like a launch price or \"this weekend only\": \"[the special, or leave this line off if there isn't one]\"\n- Don't put the post's title or hook on the image. If the post isn't promoting anything, use the post title instead.\n- What it shows: [one or two lines on a scene or objects that fit this post]\n- Keep it clean and easy to read on a phone. Not too busy.";
+  var HD_BLOCK = "MY DESIGN (use it if you have it)\nIf I've shared my Human Design Blueprint or my Soulmate Client sheet (in this chat, a project, my files or your memory of me), read them first and use them so this sounds like me and speaks to the right people. If I haven't, skip this part and write from what I told you.\n- My voice comes from what my Throat connects to. Let that shape how I say things:\n  Sacral: I speak from what I'm doing and what lights me up right now.\n  Solar Plexus: I speak from feelings and lived experience, so stories land best.\n  G Center: I speak from who I am and where I'm going.\n  Heart (Ego): I speak from what I have, what I'll do and what I promise.\n  Spleen: I speak in the moment, short and intuitive.\n  Ajna: I speak from ideas, insights and how I see things.\n  Open Throat: my voice changes with the room, so keep it natural and responsive, like I'm answering a question someone asked me.\n- Speak to my open centers. What I've lived through and soaked up there is what my soulmate clients struggle with too. Name those moments the way they'd say them, and show what changes for them.\n- Use my soulmate client's exact words and moments from the sheet in the title and first sentence.\n- Don't use Human Design words in the post unless I asked for it or the post is about Human Design. Let it shape the post, not show up in it.\n\n";
+  var IMG_TEMPLATE = "Create a square 1:1 banner for a community post. It should look like it belongs with my other graphics.\n\nMATCH MY BRAND\n- Look at the banners and graphics you've made for me before, in this chat, this project or your memory of me, and match that style: my colors, fonts, decorative details, textures and overall feel.\n- If you haven't made graphics for me before, ask me to upload 2 or 3 of my banners, or tell you my brand colors and fonts, before you create it. Don't guess.\n- If my banners usually include a photo of me, ask if I want to be in this one too.\n\nTHE BANNER\n- Main text: what I'm promoting, spelled exactly, as a short invitation like \"Join [my community]\" or the name of my offer: \"[what I'm promoting]\"\n- Second line: the special from the post, word for word, like a launch price or \"this weekend only\": \"[the special, or leave this line off if there isn't one]\"\n- Don't put the post's title or hook on the image. If the post isn't promoting anything, use the post title instead.\n- What it shows: [one or two lines on a scene or objects that fit this post]\n- In the feed this shows up as a tiny square, so keep the words on it big and few.\n- Keep it clean and easy to read on a phone. Not too busy.";
   function playbookBlock() {
     return "\nSHE SELLS™\nBlend one of these selling rules into the post in a sentence or two, in my voice. Pick the one that fits best. Don't add a section or header for it, and don't name the rule.\n\n" + PLAYBOOK + "\n";
   }
@@ -1322,6 +1324,9 @@
         '<input class="glink" type="url" aria-label="Link" data-f="link" value="' + esc(g.link) + '" placeholder="https://www.skool.com/...">' +
         '<button class="btn small danger" type="button" data-gdel>Remove</button></div>' +
         (g.mine ? "" :
+        '<div class="gdays" role="group" aria-label="My level in this group"><span class="gdl">My level</span>' +
+        [["free", "Free"], ["premium", "Premium"], ["vip", "VIP"]].map(function (o) { var on = (g.level || "free") === o[0]; return '<button type="button" class="dchip' + (on ? " on" : "") + '" data-glevel="' + o[0] + '" aria-pressed="' + on + '">' + o[1] + "</button>"; }).join("") +
+        "</div>" +
         '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
         DAYS.map(function (d, i) { return '<button type="button" class="dchip' + (days.indexOf(i) !== -1 ? " on" : "") + '" data-gday="' + i + '" aria-pressed="' + (days.indexOf(i) !== -1) + '">' + d.slice(0, 3) + "</button>"; }).join("") +
         "</div>" +
@@ -1347,6 +1352,11 @@
     if (mc) {
       var gm = S.groups.find(function (x) { return x.id === mc.closest("[data-g]").getAttribute("data-g"); });
       gm.mine = mc.getAttribute("data-gmine") === "1"; save(); renderGroups(); return;
+    }
+    var lv = e.target.closest("[data-glevel]");
+    if (lv) {
+      var gl = S.groups.find(function (x) { return x.id === lv.closest("[data-g]").getAttribute("data-g"); });
+      gl.level = lv.getAttribute("data-glevel"); save(); renderGroups(); return;
     }
     var lc = e.target.closest("[data-glim]");
     if (lc) {
@@ -1375,7 +1385,7 @@
     $("favList").innerHTML = fs.length ? fs.map(function (x) {
       var when = new Date(x.savedAt || Date.now()).toLocaleDateString([], { month: "short", day: "numeric" });
       return '<div class="fav" data-fav="' + x.id + '">' +
-        (refSrc(x.img) ? '<img class="thumb" alt="" src="' + esc(refSrc(x.img)) + '">' : "") +
+        (x.img ? '<img class="thumb" alt="" src="' + esc(x.img) + '">' : "") +
         '<div class="ft">' + esc(x.title || "Untitled post") + "</div>" +
         '<div class="fb">' + esc(toPlain(x.body || "")) + "</div>" +
         '<div class="fm">' + esc(forLabel(validFor(x.for) ? x.for : "promo")) + " \u00b7 saved " + when + "</div>" +
@@ -1432,7 +1442,6 @@
 
   load();
   route();
-  initImages();
 })();
 </script>
 </body>
