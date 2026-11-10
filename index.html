@@ -583,7 +583,7 @@
     }).then(function () { writing = false; if (again) { again = false; pushCloud(); } });
   }
   function badge(on) { var b = $("syncBadge"); b.textContent = on ? "Synced" : "Saved on this device"; b.classList.toggle("on", !!on); }
-  function imgSrc(p) { return p.imgId ? "/_blob/" + p.imgId : (p.img || ""); }
+  function imgSrc(p) { return p.img || ""; }
   function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); }
   function dataUrlToBlob(u) {
     var parts = u.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
@@ -914,6 +914,13 @@
   });
 
   /* fit the box to the text. While typing it only grows, so the page never jumps. */
+  document.addEventListener("error", function (e) {
+    var im = e.target; if (!im || im.tagName !== "IMG" || im.getAttribute("data-broken")) return;
+    im.setAttribute("data-broken", "1");
+    var box = document.createElement("span"); box.className = "thumb empty"; box.textContent = "Image missing. Add it again.";
+    if (im.parentNode && im.parentNode.classList && im.parentNode.classList.contains("simg")) { box.className = "noimg"; box.setAttribute("data-act", "img"); box.setAttribute("role", "button"); box.textContent = "\ud83d\udcf7 Image missing. Tap to add it again."; im.parentNode.replaceWith(box); }
+    else im.replaceWith(box);
+  }, true);
   function grow(el, full) {
     if (full) { el.style.height = "auto"; el.style.height = (el.scrollHeight + 4) + "px"; return; }
     if (el.scrollHeight > el.clientHeight) el.style.height = (el.scrollHeight + 4) + "px";
@@ -922,9 +929,9 @@
   function renderDay(d) {
     $("dayTitle").textContent = DAYS[d];
     renderShow();
-    var ps = shownFor(d);
+    var ps = shownFor(d), hiddenN = postsFor(d).length - ps.length;
     if (!ps.length) {
-      $("dayBody").innerHTML = '<div class="empty-day"><p>' + (showing() === "all" ? "No posts for " + DAYS[d] + " yet." : "No " + (showing() === "promo" ? "promo posts" : showing() === "social" ? "social media posts" : esc(showLabel(showing())) + " posts") + " for " + DAYS[d] + " yet.") + '</p><div class="row" style="justify-content:center"><a class="btn primary" href="#build">&#127908; Build a post</a><button class="btn" type="button" data-act="paste-here">&#10133; Paste a post</button></div></div>' +
+      $("dayBody").innerHTML = '<div class="empty-day"><p>' + (hiddenN ? "You have " + hiddenN + (hiddenN === 1 ? " post" : " posts") + " on " + DAYS[d] + ", but Showing is set to " + esc(showLabel(showing())) + '.</p><div class="row" style="justify-content:center;margin-bottom:14px"><button class="btn primary" type="button" data-act="show-all">Show all posts</button></div><p>' : "") + (showing() === "all" ? "No posts for " + DAYS[d] + " yet." : "No " + (showing() === "promo" ? "promo posts" : showing() === "social" ? "social media posts" : esc(showLabel(showing())) + " posts") + " for " + DAYS[d] + " yet.") + '</p><div class="row" style="justify-content:center"><a class="btn primary" href="#build">&#127908; Build a post</a><button class="btn" type="button" data-act="paste-here">&#10133; Paste a post</button></div></div>' +
         '<div class="panel" id="dayAdd" hidden style="margin-top:14px"><div class="field"><label for="dayAddText">Paste your post</label><textarea id="dayAddText" placeholder="The first line becomes the title."></textarea></div><div class="row"><select id="dayAddFor" aria-label="Who it\u2019s for">' + forOptions(newFor()) + '</select><button class="btn primary" type="button" data-act="add-here">Add to ' + DAYS[d] + '</button></div></div>';
       return;
     }
@@ -1160,6 +1167,7 @@
     if (k) { var p0 = curP(), gid = k.getAttribute("data-tick"); p0.posted[gid] = !p0.posted[gid]; save(); renderDay(curDay); return; }
     var a = e.target.closest("[data-act]"); if (!a) return;
     var act = a.getAttribute("data-act"), p = curP();
+    if (act === "show-all") { S.show = "all"; save(true); renderDay(curDay); return; }
     if (act === "paste-here") { $("dayAdd").hidden = false; $("dayAddText").focus(); }
     if (act === "add-here") { var n = addPosts($("dayAddText").value, curDay, $("dayAddFor").value); if (n) { var np = S.posts[S.posts.length - n]; curPost[curDay] = np.id; toast("Added " + n + (n === 1 ? " post" : " posts") + (visible(np) ? "" : " to " + showLabel(pFor(np)) + ". Switch Showing to see it.")); renderDay(curDay); } }
     if (!p) return;
