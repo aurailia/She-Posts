@@ -210,6 +210,7 @@
   .bars .b.posted i { background: var(--gold); }
   .bars .b small { font-size: 11px; color: var(--faint); }
   .bars .b em { font-style: normal; font-size: 12px; color: var(--fg); }
+  .gcat input { flex: 1 1 220px; min-width: 0; }
   .favs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
   .fav { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .fav .thumb { aspect-ratio: 1 / 1; }
@@ -1590,7 +1591,9 @@
         "</div>" +
         '<div class="gdays" role="group" aria-label="Posts a day"><span class="gdl">Posts a day</span>' +
         [[1, "1"], [2, "2"], [0, "Unlimited"]].map(function (o) { return '<button type="button" class="dchip' + (gLimit(g) === o[0] ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + (gLimit(g) === o[0]) + '">' + o[1] + "</button>"; }).join("") +
-        "</div>") + "</div>";
+        "</div>") +
+        '<div class="gdays gcat"><span class="gdl">Category</span><input type="text" aria-label="Category to post in" data-f="category" value="' + esc(g.category || "") + '" placeholder="Where you post here, like \ud83d\udce3 Promote"></div>' +
+        "</div>";
     }
     var pg = promoGroups(), mg = mineGroups();
     $("gList").innerHTML = pg.length ? pg.map(card).join("") : '<p class="hint">No promo groups yet. Add the groups where you share your offers.</p>';
