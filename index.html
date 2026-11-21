@@ -259,6 +259,7 @@
       </div>
       <div class="row">
         <button class="btn small" type="button" id="fileSave">&#128260; Phone &amp; computer</button>
+        <button class="btn small" type="button" id="toAssistant" hidden>&#10022; Send to Assistant</button>
         <button class="btn small danger" type="button" id="clearWeek">Clear the week</button>
       </div>
       <p class="savenote" id="saveNote" hidden></p>
@@ -374,6 +375,7 @@
             <button class="chip" type="button" data-shape="peek">Come take a look</button>
             <button class="chip" type="button" data-shape="spotlight">Spotlight one thing</button>
             <button class="chip" type="button" data-shape="launch">Launch</button>
+            <button class="chip" type="button" data-shape="whatif">What if</button>
           </div>
           <p class="hint" id="bShapeHint"></p>
         </div>
@@ -481,8 +483,8 @@
     "- One idea per sentence. Short sentences. Plain everyday words. Contractions. Like talking to a friend, not an ad.",
     "- End with one clear next step.",
     "- No em dashes or en dashes, no hashtags, no markdown, no hype, no guilt.",
-    "- Never use: imagine, picture this, here's the thing, the truth is, let's be honest, game-changer, unlock, unleash, elevate, embrace, journey, transform, empower, dive in, level up, scale, high-vibe, aligned action, \"it's not X, it's Y\", \"you're not X, you're Y\".",
-    "- No lists of three just for rhythm. Don't announce what you're about to say. Just say it.",
+    "- Never use: imagine, picture this, here's the thing, the truth is, let's be honest, game-changer, unlock, unleash, elevate, embrace, journey, transform, empower, dive in, level up, scale, high-vibe, aligned action, \"it's not X, it's Y\", \"you're not X, you're Y\", \"isn't just another X, it's Y\".",
+    "- No lists of three just for rhythm, like \"More X. More Y. More Z.\" or the same line three times in a row. Keep the one strongest line. Don't announce what you're about to say. Just say it.",
     "- Never invent results, prices, dates, testimonials or stories. Leave a [bracket] for anything you don't know.",
     "- Don't assume the reader or their buyers are women unless told."
   ].join("\n");
@@ -521,8 +523,69 @@
     if (!quiet) S.updatedAt = Date.now();
     setTimeout(markDirty, 0);
     queueCloud();
-    try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
+    if (imgDB) syncImgs();
+    try { localStorage.setItem(KEY, slimState()); return true; }
     catch (e) { if (cloud) return true; toast("Storage is full. Remove an image or clear the week, then try again."); return false; }
+  }
+
+  /* ---------- images live in IndexedDB (lots of room) instead of localStorage (about 5MB) ---------- */
+  var imgDB = null, imgKeys = {};
+  function isData(v) { return typeof v === "string" && v.indexOf("data:") === 0; }
+  function slimState() {
+    return JSON.stringify(S, function (k, v) { return (k === "img" && imgDB && isData(v)) ? "" : v; });
+  }
+  function openImgDB() {
+    return new Promise(function (res) {
+      var done = false; function fin(db) { if (!done) { done = true; res(db); } }
+      setTimeout(function () { fin(null); }, 3000);
+      try {
+        var r = indexedDB.open("sp-promo-images", 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore("img"); };
+        r.onsuccess = function () { fin(r.result); };
+        r.onerror = function () { fin(null); };
+        r.onblocked = function () { fin(null); };
+      } catch (e) { fin(null); }
+    });
+  }
+  function readAllImgs(db) {
+    return new Promise(function (res) {
+      var out = {};
+      try {
+        var req = db.transaction("img", "readonly").objectStore("img").openCursor();
+        req.onsuccess = function () { var c = req.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); };
+        req.onerror = function () { res(out); };
+      } catch (e) { res(out); }
+    });
+  }
+  function wantedImgs() {
+    var want = {};
+    S.posts.forEach(function (p) { if (isData(p.img)) want["p:" + p.id] = p.img; });
+    (S.favs || []).forEach(function (f) { if (f.id && isData(f.img)) want["f:" + f.id] = f.img; });
+    return want;
+  }
+  function syncImgs() {
+    var want = wantedImgs(), changed = false, k;
+    for (k in want) if (imgKeys[k] !== want[k]) changed = true;
+    for (k in imgKeys) if (!(k in want)) changed = true;
+    if (!changed) return;
+    try {
+      var tx = imgDB.transaction("img", "readwrite"), st = tx.objectStore("img");
+      for (k in want) if (imgKeys[k] !== want[k]) st.put(want[k], k);
+      for (k in imgKeys) if (!(k in want)) st.delete(k);
+      tx.oncomplete = function () { imgKeys = want; };
+    } catch (e) {}
+  }
+  function startImages() {
+    return openImgDB().then(function (db) {
+      if (!db) return;
+      return readAllImgs(db).then(function (stored) {
+        imgKeys = stored;
+        S.posts.forEach(function (p) { if (!p.img && !p.imgId && stored["p:" + p.id]) p.img = stored["p:" + p.id]; });
+        (S.favs || []).forEach(function (f) { if (f.id && !f.img && stored["f:" + f.id]) f.img = stored["f:" + f.id]; });
+        imgDB = db;
+        save(true);
+      });
+    }).catch(function () {});
   }
 
   /* ---------- move my week between devices ---------- */
@@ -818,6 +881,25 @@
       ? "<li>Tap <b>Save to a file</b>. Your share sheet opens.</li><li>Tap <b>Save to Files</b> and choose <b>iCloud Drive</b>.</li><li>On your computer, open She Posts, tap <b>Phone &amp; computer</b>, then <b>Open a file</b> and pick it.</li>"
       : "<li>Click <b>Save to a file</b>. It lands in your Downloads.</li><li>Drag it into <b>iCloud Drive</b> (or email it to yourself) so your phone can reach it.</li><li>On your phone, open She Posts, tap <b>Phone &amp; computer</b>, then <b>Open a file</b> and pick it.</li>";
     $("filePanel").hidden = true; p.hidden = false;
+  });
+
+  /* ---------- She Posts Assistant (Chrome extension) ---------- */
+  window.addEventListener("message", function (e) {
+    if (!e.data || e.data.source !== "sp-assistant") return;
+    if (e.data.type === "hello") { $("toAssistant").hidden = false; return; }
+    if (e.data.type === "got") { toast("Sent to your Assistant \u2726 " + e.data.count + (e.data.count === 1 ? " post" : " posts")); return; }
+    if (e.data.type === "marks" && Array.isArray(e.data.marks)) {
+      var changed = 0;
+      e.data.marks.forEach(function (x) {
+        var lp = S.posts.find(function (p) { return p.id === x[0]; }); if (!lp) return;
+        lp.posted = lp.posted || {};
+        (x[1] || []).forEach(function (g) { if (!lp.posted[g]) { lp.posted[g] = true; changed++; } });
+      });
+      if (changed) { save(); renderWeek(); toast("Your Assistant checked off " + changed + (changed === 1 ? " group" : " groups") + " \u2726"); }
+    }
+  });
+  $("toAssistant").addEventListener("click", function () {
+    window.postMessage({ source: "she-posts", type: "week", data: { posts: S.posts, groups: S.groups } }, location.origin);
   });
   $("marksCopy").addEventListener("click", function () {
     packMarks().then(function (code) { copy(code, "Copied. Send it to yourself, then paste it on your other device."); }, function () { toast("Something went wrong. Try again."); });
@@ -1246,9 +1328,9 @@
     for (var i = 1; i <= n; i++) s += (n > 1 ? "VERSION " + i + "\n" : "") + "TITLE: [the title]\nPOST:\n[the post]\n" + (b.img ? "IMAGE PROMPT: [the image prompt]\n" : "") + (i < n ? "\n" : "");
     return s;
   }
-  var STYLE = "STYLE GUIDE (follow it for every version)\nIf you can see a style guide or saved example posts of mine (in a project or files I've shared), read them first and follow them too. Where they're more specific, they win. Never copy wording from the examples, only how they work.\n\nTone: witty, fun and a little playful, and it always teaches something real. It sounds like me talking to a friend over coffee. The humor comes from how true it is, like \"You've joined 14 promo groups and posted in two. I see you.\" Laugh with the reader, never at them. Every post leaves them with something they can use today. If a line could sit in anyone else's post, rewrite it until it sounds like me.\n\nWhat makes people read and buy (use the pattern, never name it):\n- Name the exact frustration they feel right now, in the words they'd use.\n- Show why it matters. Right after the hook, help them feel what's at stake with a real moment they'd recognize, not a lecture. (For a post about engagement: when nobody comments, new members decide the room is empty and quietly leave.)\n- Name the cost of leaving it as it is: hours, money, clients who never found them, the energy of posting into silence. One or two honest lines. No fear, no guilt. The cost makes them care, and the tip that follows gives relief.\n- Confess you've done it too, then a short reaction on its own line.\n- Real numbers feel true (\"rewrote it 5 times\", \"45 minutes\"). Vague words feel like marketing.\n- List real moments they'd use it, each with a matching emoji, so every reader finds themselves in one line.\n- Bust a belief they hold to stop the scroll, then give them relief.\n- Give a real tip before the pitch.\n- Make the win tiny and doable today.\n- Show how easy it is in short steps.\n- Answer the one objection that matters most before they think it.\n- Share a little of yourself: a laugh at yourself, or \"I wish I'd had this when I started.\"\n- If it's still growing, say so. It feels honest and invites them in early.\n- Lead with FREE when it's free.\n- For a deal: the regular price next to the deal price, the reason for the deal, and the fine print in one plain line. Only use prices, dates and codes I gave you.\n- Show exactly what they get in a short list.\n- If one thing is only in a paid tier, say it once with a \ud83d\udd12, no pressure.\n- One clear next step. One link.\n- Invite them to come back and share how it went.\n\nTITLE AND FIRST SENTENCE (this matters most)\nIn the Skool feed, people only see the title, about the first 20 words of the post and a tiny image. That's all they see before they decide to stop or keep scrolling. The title earns the stop. The first sentence earns the click.\n- Title: names a moment they know, often as a question, like \"Wake up tired even after 8 hours of sleep? \ud83d\ude34\". Or names what waiting is costing them, like \"Every month without a website is a month of clients you never meet\". Fits on one line on a phone, about 10 words or less, one emoji.\n- First sentence: about 20 words. It picks up where the title leaves off and never repeats it. It tells them what you've got for it and gives a reason to tap, often ending with \"Here's how it works \ud83d\udc47\" or similar.\n- Never open with a greeting like \"Hey everyone, hope you're having a great week.\" Go straight to a moment they know.\n- If you name the cost, keep it honest and kind. It should make them care, not feel guilty.\n\nThe shape:\n- Hook: the title and first sentence above. CAPS on one or two words for punch, never more. A knowing emoji like \ud83d\ude02 is welcome.\n- Why it matters and the cost, in a few short lines.\n- Value: one tip or bit of selling psychology, then a \"Try this today\" quick win. Bold the one phrase that lands the insight.\n- Bridge to the offer by name, in Unicode bold.\n- A short list of what's inside, with one emoji as the bullet.\n- Close: a bold line that says the real problem in a new way, a bold invitation (lead with FREE if it's free), then \ud83d\udc49 and the link.\n- Very short lines and lots of white space for people skimming. Pick one signature emoji and repeat it through the post as a thread.\n- Write fresh. Never copy wording from any post you've seen.";
-  var SHAPES = {"tip": "TIP, THEN INVITE: hook, why it matters and the cost, a 💡 bit of selling psychology, a Try this today quick win, bridge to my offer, what they get (one emoji per tier if there are tiers), a bold reframe of the problem, the invitation, 👉 link.", "peek": "COME TAKE A LOOK: a casual, funny hook, a line on why it matters, an invitation to take a look (or another look) at a resource, an Inside you'll find list, FREE called out if it's free, a personal line about why it exists and that it's still growing, a line for both new and returning readers, then a warm one-line close.", "spotlight": "SPOTLIGHT ONE THING: a belief-busting hook, why it matters and the cost, a quick tip, then make one tool or benefit the star. One line on what it is and who it's for, a ✓ checklist where each item is a bold label and one short benefit, NEW in front of anything new, tie it to the tier that gets it with a 🔒 line, then 👉 link.", "launch": "LAUNCH: a confession hook, a short me-too reaction on its own line, what it costs them now (time, stress, missed chances), a scenario list with a matching emoji per line, ✅ how it works in short steps, the launch price next to the regular price with the reason and code (only if I gave them), the fine print in one line, 👉 link, ask buyers to come back and share their stories, and end on a funny, true one-liner."};
-  var SHAPE_HINTS = { auto: "Claude picks the shape that fits what you're sharing.", tip: "Teach one thing first, then invite them in. Great for your community or a paid tier.", peek: "A casual invite to a free resource, new or newly updated.", spotlight: "Make one tool or perk the star, and tie it to the tier that gets it.", launch: "A new offer or product, with a launch price if you have one." };
+  var STYLE = "STYLE GUIDE (follow it for every version)\nIf you can see a style guide or saved example posts of mine (in a project or files I've shared), read them first and follow them too. Where they're more specific, they win. Never copy wording from the examples, only how they work.\n\nTone: witty, fun and a little playful, and it always teaches something real. It sounds like me talking to a friend over coffee. The humor comes from how true it is, like \"You've joined 14 promo groups and posted in two. I see you.\" Laugh with the reader, never at them. Every post leaves them with something they can use today. If a line could sit in anyone else's post, rewrite it until it sounds like me.\n\nWhat makes people read and buy (use the pattern, never name it):\n- Name the exact frustration they feel right now, in the words they'd use.\n- Or open a possibility they're missing with a \"What if\" question, then paint what's already waiting for them. Curiosity earns the click too, and it feels lighter.\n- Turn it back on them with one question they'll answer in their head, like whether they're showing up where people can find them.\n- Show why it matters. Right after the hook, help them feel what's at stake with a real moment they'd recognize, not a lecture. (For a post about engagement: when nobody comments, new members decide the room is empty and quietly leave.)\n- Name the cost of leaving it as it is: hours, money, clients who never found them, the energy of posting into silence. One or two honest lines. No fear, no guilt. The cost makes them care, and the tip that follows gives relief.\n- Confess you've done it too, then a short reaction on its own line.\n- Real numbers feel true (\"rewrote it 5 times\", \"45 minutes\"). Vague words feel like marketing.\n- List real moments they'd use it, each with a matching emoji, so every reader finds themselves in one line.\n- Bust a belief they hold to stop the scroll, then give them relief.\n- Give a real tip before the pitch.\n- Make the win tiny and doable today.\n- Show how easy it is in short steps.\n- Answer the one objection that matters most before they think it.\n- Share a little of yourself: a laugh at yourself, or \"I wish I'd had this when I started.\"\n- If it's still growing, say so. It feels honest and invites them in early.\n- Lead with FREE when it's free.\n- For a deal: the regular price next to the deal price, the reason for the deal, and the fine print in one plain line. Only use prices, dates and codes I gave you.\n- Show exactly what they get in a short list.\n- If one thing is only in a paid tier, say it once with a \ud83d\udd12, no pressure.\n- One clear next step. One link.\n- Invite them to come back and share how it went.\n- If there's a second real reason to say yes (like earning while they grow), say it once.\n- Carry one theme through the whole post: the name, the emojis, the image idea and the call to action.\n- Or close with a kind choice that puts the decision in their hands, never guilt.\n\nTITLE AND FIRST SENTENCE (this matters most)\nIn the Skool feed, people only see the title, about the first 20 words of the post and a tiny image. That's all they see before they decide to stop or keep scrolling. The title earns the stop. The first sentence earns the click.\n- Title: names a moment they know, often as a question, like \"Wake up tired even after 8 hours of sleep? \ud83d\ude34\". Or names what waiting is costing them, like \"Every month without a website is a month of clients you never meet\". Fits on one line on a phone, about 10 words or less, one emoji.\n- First sentence: about 20 words. It picks up where the title leaves off and never repeats it. It tells them what you've got for it and gives a reason to tap, often ending with \"Here's how it works \ud83d\udc47\" or similar.\n- Never open with a greeting like \"Hey everyone, hope you're having a great week.\" Go straight to a moment they know.\n- If you name the cost, keep it honest and kind. It should make them care, not feel guilty.\n\nThe shape:\n- Hook: the title and first sentence above. CAPS on one or two words for punch, never more. A knowing emoji like \ud83d\ude02 is welcome.\n- Why it matters and the cost, in a few short lines.\n- Value: one tip or bit of selling psychology, then a \"Try this today\" quick win. Bold the one phrase that lands the insight.\n- Bridge to the offer by name, in Unicode bold.\n- A short list of what's inside, with one emoji as the bullet.\n- Close: a bold line that says the real problem in a new way, a bold invitation (lead with FREE if it's free), then \ud83d\udc49 and the link.\n- Very short lines and lots of white space for people skimming. Pick one signature emoji and repeat it through the post as a thread.\n- Write fresh. Never copy wording from any post you've seen.";
+  var SHAPES = {"tip": "TIP, THEN INVITE: hook, why it matters and the cost, a 💡 bit of selling psychology, a Try this today quick win, bridge to my offer, what they get (one emoji per tier if there are tiers), a bold reframe of the problem, the invitation, 👉 link.", "peek": "COME TAKE A LOOK: a casual, funny hook, a line on why it matters, an invitation to take a look (or another look) at a resource, an Inside you'll find list, FREE called out if it's free, a personal line about why it exists and that it's still growing, a line for both new and returning readers, then a warm one-line close.", "spotlight": "SPOTLIGHT ONE THING: a belief-busting hook, why it matters and the cost, a quick tip, then make one tool or benefit the star. One line on what it is and who it's for, a ✓ checklist where each item is a bold label and one short benefit, NEW in front of anything new, tie it to the tier that gets it with a 🔒 line, then 👉 link.", "launch": "LAUNCH: a confession hook, a short me-too reaction on its own line, what it costs them now (time, stress, missed chances), a scenario list with a matching emoji per line, ✅ how it works in short steps, the launch price next to the regular price with the reason and code (only if I gave them), the fine print in one line, 👉 link, ask buyers to come back and share their stories, and end on a funny, true one-liner.", "whatif": "WHAT IF: a \"What if\" title with 👀 that opens a good possibility they're missing, one line on what's already waiting for them, one question that turns it back on them, what the offer or community is said plainly, plus a second reason to say yes if there is one, a short list of what they get with one emoji as the bullet, a bold close that kindly puts the choice in their hands, then one link with an emoji that fits the theme. Carry one theme through the whole post."};
+  var SHAPE_HINTS = { auto: "Claude picks the shape that fits what you're sharing.", tip: "Teach one thing first, then invite them in. Great for your community or a paid tier.", peek: "A casual invite to a free resource, new or newly updated.", spotlight: "Make one tool or perk the star, and tie it to the tier that gets it.", launch: "A new offer or product, with a launch price if you have one.", whatif: "Open with a possibility they're missing. Great for inviting people into your community." };
   function shapeBlock(k) {
     if (SHAPES[k]) return "POST SHAPE (use this one)\n" + SHAPES[k];
     return "POST SHAPE\nPick the one that fits best:\n" + Object.keys(SHAPES).map(function (x) { return "- " + SHAPES[x]; }).join("\n");
@@ -1449,7 +1531,7 @@
   });
 
   load();
-  route();
+  startImages().then(function () { route(); });
 })();
 </script>
 </body>
