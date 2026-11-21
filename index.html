@@ -179,6 +179,37 @@
   .showbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
   .showbar .label { margin: 0; }
   .showbar select { width: auto; min-width: 220px; max-width: 100%; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .stat b { display: block; font-family: var(--font-display); font-size: 32px; color: var(--gold); line-height: 1.1; }
+  .stat span { font-size: 14px; color: var(--muted); }
+  .sblock { margin: 0 0 28px; }
+  .sblock h2 { margin: 0 0 4px; }
+  .sblock > .hint { margin: 0 0 12px; }
+  .srow { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin-bottom: 10px; min-width: 0; }
+  .srow .av2 { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; background: linear-gradient(135deg, var(--gold), var(--blush)); }
+  .srow .grow { flex: 1; min-width: 0; }
+  .srow .nm { font-weight: 700; overflow-wrap: anywhere; }
+  .srow .sub { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .srow .q { font-size: 15px; color: var(--fg); margin-top: 4px; overflow-wrap: anywhere; }
+  .pill { display: inline-block; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .pill.in { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .pill.warm { background: var(--blush); color: var(--on-gold); border-color: var(--blush); }
+  .bestpost { display: grid; grid-template-columns: 84px 1fr; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); margin-bottom: 12px; }
+  .bestpost img, .bestpost .noimg { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; background: var(--bg); border: 1px solid var(--line); }
+  .bestpost .rank { font-size: 13px; font-weight: 700; color: var(--gold); letter-spacing: .06em; text-transform: uppercase; }
+  .bestpost .ttl2 { font-weight: 700; overflow-wrap: anywhere; }
+  .bestpost .per { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .gtable { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .gtable th { text-align: left; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  .gtable td { padding: 10px 6px; border-bottom: 1px solid var(--line); color: var(--fg); }
+  .gtable td.n { text-align: right; white-space: nowrap; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding: 8px 0 0; }
+  .bars .b { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+  .bars .b i { display: block; width: 100%; max-width: 28px; border-radius: 6px 6px 2px 2px; background: var(--line-strong); }
+  .bars .b.posted i { background: var(--gold); }
+  .bars .b small { font-size: 11px; color: var(--faint); }
+  .bars .b em { font-style: normal; font-size: 12px; color: var(--fg); }
   .favs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
   .fav { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .fav .thumb { aspect-ratio: 1 / 1; }
@@ -237,6 +268,7 @@
       <a href="#week" data-nav="week">My week</a>
       <a href="#build" data-nav="build">Build a post</a>
       <a href="#favorites" data-nav="favorites">&#9733; Favorites</a>
+      <a href="#analytics" data-nav="analytics">&#128200; Analytics</a>
       <a href="#groups" data-nav="groups">Groups &amp; offers</a>
     </nav>
     <label class="sr" for="navSel">Go to</label>
@@ -244,6 +276,7 @@
       <option value="week">&#128197; My week</option>
       <option value="build">&#127908; Build a post</option>
       <option value="favorites">&#9733; Favorites</option>
+      <option value="analytics">&#128200; Analytics</option>
       <option value="groups">&#128101; Groups &amp; offers</option>
     </select>
   </header>
@@ -410,6 +443,13 @@
     <h1>Favorites</h1>
     <p class="lede">Posts that did well, saved to use again. Star a post on any day to keep it here. Clearing the week won't touch them.</p>
     <div class="favs" id="favList"></div>
+  </section>
+
+  <!-- ANALYTICS -->
+  <section id="vStats" hidden>
+    <h1>Analytics</h1>
+    <p class="lede">How your posts are doing, who's loving them, and who's joining you. It fills in on its own from your She Posts Assistant.</p>
+    <div id="statsBody"></div>
   </section>
 
   <!-- GROUPS -->
@@ -798,8 +838,8 @@
   /* ---------- views ---------- */
   var curDay = 0, curPost = {};
   function show(view) {
-    ["vWeek", "vDay", "vBuild", "vFavs", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
-    var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : view === "vFavs" ? "favorites" : "groups";
+    ["vWeek", "vDay", "vBuild", "vFavs", "vStats", "vGroups"].forEach(function (id) { $(id).hidden = id !== view; });
+    var nav = view === "vDay" ? "week" : view === "vWeek" ? "week" : view === "vBuild" ? "build" : view === "vFavs" ? "favorites" : view === "vStats" ? "analytics" : "groups";
     document.querySelectorAll("[data-nav]").forEach(function (a) { a.classList.toggle("on", a.getAttribute("data-nav") === nav); });
     $("navSel").value = nav;
   }
@@ -815,6 +855,7 @@
     else if (h === "build") { show("vBuild"); renderBuild(); }
     else if (h === "groups") { show("vGroups"); renderGroups(); }
     else if (h === "favorites") { show("vFavs"); renderFavs(); }
+    else if (h === "analytics") { show("vStats"); renderStats(); }
     else { show("vWeek"); renderWeek(); }
     if (keep !== true) window.scrollTo(0, 0);
   }
@@ -883,10 +924,137 @@
     $("filePanel").hidden = true; p.hidden = false;
   });
 
+
+  /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
+  var AKEY = "sp-analytics-v1", hasAssistant = false;
+  function loadA() { try { return JSON.parse(localStorage.getItem(AKEY) || "null"); } catch (e) { return null; } }
+  function ago(t) {
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 2) return "just now"; if (m < 60) return m + " min ago";
+    var h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? " hour ago" : " hours ago");
+    var d = Math.round(h / 24); return d + (d === 1 ? " day ago" : " days ago");
+  }
+  function dayKey(t) { var d = new Date(t); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+  function avatar(pic) { return pic ? '<img class="av2" src="' + esc(pic) + '" alt="">' : '<span class="av2"></span>'; }
+  function prof(p) { return p.handle ? '<a href="https://www.skool.com/@' + encodeURIComponent(p.handle) + '" target="_blank" rel="noopener" style="color:inherit">' + esc(p.name) + "</a>" : esc(p.name); }
+  function score(g) { return (g.likes || 0) + 2 * (g.comments || 0); }
+  function renderStats() {
+    var A = loadA(), box = $("statsBody");
+    if (!A) {
+      box.innerHTML = '<div class="panel"><p style="margin:0">' + (hasAssistant ? "Post with your Assistant and your numbers show up here within a few hours. Want them now? Tap Update now." : "Install She Posts Assistant in Chrome and post with it. Your numbers show up here on their own.") + "</p>" +
+        (hasAssistant ? '<div class="row"><button class="btn primary" type="button" data-sact="refresh">Update now</button></div>' : "") + "</div>";
+      return;
+    }
+    var now = Date.now(), M30 = 30 * 86400000, html = "";
+    html += '<div class="row" style="justify-content:space-between;margin-bottom:14px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
+      (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</div>";
+
+    // Totals for the last 30 days
+    var sends = 0, likes = 0, comms = 0;
+    A.posts.forEach(function (p) { p.groups.forEach(function (g) { if (now - g.postedAt < M30) { sends++; likes += g.likes; comms += g.comments; } }); });
+    var joins30 = (A.newMembers || []).filter(function (n) { return now - n.joinedAt < M30; }).length;
+    html += '<div class="stat-row">' +
+      '<div class="stat"><b>' + sends + "</b><span>posts sent, last 30 days</span></div>" +
+      '<div class="stat"><b>' + likes + "</b><span>likes</span></div>" +
+      '<div class="stat"><b>' + comms + "</b><span>comments</span></div>" +
+      (A.hasCommunity ? '<div class="stat"><b>' + joins30 + "</b><span>new members</span></div>" : "") + "</div>";
+
+    // Comments waiting
+    var W = A.waiting || [];
+    html += '<div class="sblock"><h2>&#128172; Comments waiting on you</h2><p class="hint">Replying fast keeps your post showing up for more people.</p>' +
+      (W.length ? W.slice(0, 20).map(function (w) {
+        return '<div class="srow">' + avatar(w.pic) + '<div class="grow"><div class="nm">' + prof({ name: w.who, handle: w.handle }) + '</div><div class="sub">' + ago(w.at) + " · " + esc(w.group || "") + " · " + esc((w.title || "").slice(0, 60)) + '</div>' +
+          (w.text ? '<div class="q">“' + esc(w.text) + '”</div>' : "") + '</div><div class="row" style="flex-direction:column;gap:6px">' +
+          '<a class="btn small primary" href="' + esc(w.url) + '" target="_blank" rel="noopener">Reply &#8599;</a><button class="btn small" type="button" data-sact="done" data-id="' + esc(w.id) + '">Done</button></div></div>';
+      }).join("") : '<div class="panel"><p style="margin:0">You’re all caught up ✦</p></div>') + "</div>";
+
+    // Best posts
+    var ranked = A.posts.map(function (p) {
+      var t = p.groups.reduce(function (a, g) { a.l += g.likes; a.c += g.comments; return a; }, { l: 0, c: 0 });
+      var best = p.groups.slice().sort(function (a, b) { return score(b) - score(a); })[0];
+      return { p: p, l: t.l, c: t.c, s: t.l + 2 * t.c, best: best };
+    }).filter(function (x) { return x.p.groups.length; }).sort(function (a, b) { return b.s - a.s; });
+    html += '<div class="sblock"><h2>&#127942; Your best posts</h2><p class="hint">Ranked by likes and comments, with comments counting double.</p>' +
+      (ranked.length ? ranked.slice(0, 6).map(function (x, i) {
+        return '<div class="bestpost">' + (x.p.thumb ? '<img src="' + x.p.thumb + '" alt="">' : '<span class="noimg"></span>') +
+          '<div style="min-width:0"><div class="rank">#' + (i + 1) + '</div><div class="ttl2">' + esc(x.p.title || "(no title)") + "</div>" +
+          '<div class="per">👍 ' + x.l + " · 💬 " + x.c + " · in " + x.p.groups.length + (x.p.groups.length === 1 ? " group" : " groups") +
+          (x.best && score(x.best) ? " · did best in " + esc(x.best.name) : "") + "</div>" +
+          '<div class="row" style="margin-top:8px"><button class="btn small" type="button" data-sact="fav" data-id="' + esc(x.p.id) + '">&#9733; Save to Favorites</button></div></div></div>';
+      }).join("") : '<div class="panel"><p style="margin:0">Your best posts show up here once you’ve posted with your Assistant.</p></div>') + "</div>";
+
+    // Groups
+    var G = {};
+    A.posts.forEach(function (p) { p.groups.forEach(function (g) { var x = G[g.name] || (G[g.name] = { n: 0, l: 0, c: 0 }); x.n++; x.l += g.likes; x.c += g.comments; }); });
+    var gl = Object.keys(G).map(function (k) { var x = G[k]; return { name: k, n: x.n, l: x.l / x.n, c: x.c / x.n }; }).sort(function (a, b) { return (b.l + 2 * b.c) - (a.l + 2 * a.c); });
+    var wd = {}; A.posts.forEach(function (p) { p.groups.forEach(function (g) { var d = (new Date(g.postedAt).getDay() + 6) % 7; var x = wd[d] || (wd[d] = { n: 0, s: 0 }); x.n++; x.s += score(g); }); });
+    var days = Object.keys(wd).filter(function (d) { return wd[d].n >= 2; }).sort(function (a, b) { return wd[b].s / wd[b].n - wd[a].s / wd[a].n; });
+    if (gl.length) {
+      html += '<div class="sblock"><h2>&#128205; Where your posts land best</h2><p class="hint">Average likes and comments per post in each group.' +
+        (days.length >= 2 ? " Your best day to post so far: <b>" + DAYS[days[0]] + "</b>." : "") + "</p>" +
+        '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Posts</th><th class="n">👍 avg</th><th class="n">💬 avg</th></tr></thead><tbody>' +
+        gl.map(function (g) { return "<tr><td>" + esc(g.name) + '</td><td class="n">' + g.n + '</td><td class="n">' + g.l.toFixed(1) + '</td><td class="n">' + g.c.toFixed(1) + "</td></tr>"; }).join("") +
+        "</tbody></table></div></div>";
+    }
+
+    // Warm people
+    var warm = A.warm || [];
+    if (warm.length) {
+      var sorted = warm.slice().sort(function (a, b) { return (a.inMine === false ? 0 : 1) - (b.inMine === false ? 0 : 1); });
+      html += '<div class="sblock"><h2>&#128150; Your warm people</h2><p class="hint">Everyone who liked or commented on your promos. The ones not in your community yet are at the top.</p>' +
+        sorted.slice(0, 20).map(function (p) {
+          var pill = p.inMine === true ? '<span class="pill in">In your community</span>' : p.inMine === false ? '<span class="pill warm">Not in yet</span>' : "";
+          return '<div class="srow">' + avatar(p.pic) + '<div class="grow"><div class="nm">' + prof(p) + '</div><div class="sub">👍 ' + p.likes + " · 💬 " + p.comments + (p.groups.length ? " · " + esc(p.groups.slice(0, 3).join(", ")) : "") + "</div></div>" + pill + "</div>";
+        }).join("") + "</div>";
+    }
+
+    // New members and joins by day
+    if (A.hasCommunity) {
+      var NM = A.newMembers || [];
+      html += '<div class="sblock"><h2>&#127793; New members</h2><p class="hint">Where else they hang out, from their Skool profile. It’s a hint about where they found you, not proof.</p>' +
+        (NM.length ? NM.slice(0, 15).map(function (n) {
+          var also = n.alsoIn === null || n.alsoIn === undefined ? "Checking where else they hang out…" : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) : "Not in any of your promo groups";
+          return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined ' + ago(n.joinedAt) + " · " + also + "</div></div></div>";
+        }).join("") : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
+      var posted = {}; A.posts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
+      var cnt = {}; NM.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
+      var cols = [], max = 1;
+      for (var i = 13; i >= 0; i--) { var t = now - i * 86400000, k = dayKey(t); cols.push({ k: k, n: cnt[k] || 0, p: !!posted[k], lbl: ["S", "M", "T", "W", "T", "F", "S"][new Date(t).getDay()] }); max = Math.max(max, cnt[k] || 0); }
+      html += '<div class="sblock"><h2>&#128197; Joins by day</h2><p class="hint">The last two weeks. Gold bars are days you posted.</p><div class="panel"><div class="bars">' +
+        cols.map(function (c) { return '<div class="b' + (c.p ? " posted" : "") + '"><em>' + (c.n || "") + '</em><i style="height:' + Math.max(4, Math.round(c.n / max * 80)) + 'px"></i><small>' + c.lbl + "</small></div>"; }).join("") + "</div></div></div>";
+    }
+    box.innerHTML = html;
+  }
+  $("statsBody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-sact]"); if (!b) return;
+    var act = b.getAttribute("data-sact");
+    if (act === "refresh") { b.disabled = true; b.textContent = "Updating…"; window.postMessage({ source: "she-posts", type: "refresh" }, location.origin); toast("Updating your numbers. This takes a minute or two."); }
+    if (act === "done") {
+      var id = b.getAttribute("data-id"), A = loadA();
+      if (A) { A.waiting = (A.waiting || []).filter(function (w) { return w.id !== id; }); try { localStorage.setItem(AKEY, JSON.stringify(A)); } catch (e2) {} }
+      window.postMessage({ source: "she-posts", type: "dismiss", id: id }, location.origin); renderStats();
+    }
+    if (act === "fav") {
+      var pid = b.getAttribute("data-id"), A2 = loadA(); if (!A2) return;
+      var hp = A2.posts.find(function (x) { return x.id === pid; }); if (!hp) return;
+      if (S.favs.some(function (x) { return x.src === pid; })) { toast("That one’s already in your favorites ★"); return; }
+      var live = S.posts.find(function (x) { return x.id === pid; });
+      S.favs.unshift({ id: "f" + uid(), src: pid, title: hp.title, body: hp.body, imgPrompt: live ? live.imgPrompt || "" : "", img: live && live.img ? live.img : (hp.thumb || ""), for: live ? pFor(live) : "promo", savedAt: Date.now() });
+      if (!save()) { S.favs[0].img = ""; save(); }
+      toast("Saved to favorites ★");
+    }
+  });
   /* ---------- She Posts Assistant (Chrome extension) ---------- */
   window.addEventListener("message", function (e) {
     if (!e.data || e.data.source !== "sp-assistant") return;
-    if (e.data.type === "hello") { $("toAssistant").hidden = false; return; }
+    if (e.data.type === "hello") { $("toAssistant").hidden = false; if (!hasAssistant) { hasAssistant = true; if (!$("vStats").hidden) renderStats(); } return; }
+    if (e.data.type === "analytics" && e.data.data) {
+      try { localStorage.setItem(AKEY, JSON.stringify(e.data.data)); }
+      catch (err) { var lite = JSON.parse(JSON.stringify(e.data.data)); lite.posts.forEach(function (p) { p.thumb = ""; }); try { localStorage.setItem(AKEY, JSON.stringify(lite)); } catch (err2) {} }
+      if (!$("vStats").hidden) renderStats();
+      return;
+    }
+    if (e.data.type === "refreshed") { toast(e.data.ok ? "Your numbers are up to date ✦" : (e.data.why || "That didn’t work. Try again in a bit.")); if (!$("vStats").hidden) renderStats(); return; }
     if (e.data.type === "got") { toast("Sent to your Assistant \u2726 " + e.data.count + (e.data.count === 1 ? " post" : " posts")); return; }
     if (e.data.type === "marks" && Array.isArray(e.data.marks)) {
       var changed = 0;
