@@ -970,17 +970,33 @@
     var perCommunity = CM.map(function (c) { return { name: c.name, n: (A.newMembers || []).filter(function (n) { return n.community === c.slug && now - n.joinedAt < R.ms; }).length }; });
     if (!CK) { var seenN = {}; A.newMembers = (A.newMembers || []).filter(function (n) { if (seenN[n.id]) return false; seenN[n.id] = 1; return true; }); }
     var allPosts = A.posts.map(function (p) { return { groups: p.groups.slice() }; });
-    A.posts = A.posts.map(function (p) { p.groups = p.groups.filter(function (g) { return now - g.postedAt < R.ms; }); return p; }).filter(function (p) { return p.groups.length; });
+    // Likes and comments that came in during the chosen time
+    var start = now - R.ms;
+    function gained(g) {
+      var pts = (g.s || []).slice().sort(function (a, b) { return a[0] - b[0]; });
+      var endL = g.likes || 0, endC = g.comments || 0;
+      if (g.postedAt >= start) return { l: endL, c: endC };
+      if (!pts.length) return { l: 0, c: 0 };
+      var base = null;
+      pts.forEach(function (p) { if (p[0] <= start) base = p; });
+      if (!base) base = pts[0];   // tracking began inside this time, so count from the first check
+      return { l: Math.max(0, endL - base[1]), c: Math.max(0, endC - base[2]) };
+    }
+    A.posts = A.posts.map(function (p) {
+      p.groups = p.groups.map(function (g) { var x = gained(g); g.sent = g.postedAt >= start; g.likes = x.l; g.comments = x.c; return g; })
+        .filter(function (g) { return g.sent || g.likes || g.comments; });
+      return p;
+    }).filter(function (p) { return p.groups.length; });
     A.warm = (A.warm || []).filter(function (p) { return !p.lastAt || now - p.lastAt < R.ms; });
     var allMembers = A.newMembers || [];
     A.newMembers = allMembers.filter(function (n) { return now - n.joinedAt < R.ms; });
 
     var sends = 0, likes = 0, comms = 0;
-    A.posts.forEach(function (p) { p.groups.forEach(function (g) { sends++; likes += g.likes; comms += g.comments; }); });
+    A.posts.forEach(function (p) { p.groups.forEach(function (g) { if (g.sent) sends++; likes += g.likes; comms += g.comments; }); });
     html += '<div class="stat-row">' +
       '<div class="stat"><b>' + sends + "</b><span>posts sent, " + R.lbl2 + "</span></div>" +
-      '<div class="stat"><b>' + likes + "</b><span>likes on them</span></div>" +
-      '<div class="stat"><b>' + comms + "</b><span>comments on them</span></div>" +
+      '<div class="stat"><b>' + likes + "</b><span>likes, " + R.lbl2 + "</span></div>" +
+      '<div class="stat"><b>' + comms + "</b><span>comments, " + R.lbl2 + "</span></div>" +
       (A.hasCommunity ? '<div class="stat"><b>' + A.newMembers.length + "</b><span>new members" + (CK ? " in " + esc(CN) : "") + "</span></div>" : "") + "</div>";
     if (!CK && CM.length > 1 && A.hasCommunity) html += '<p class="hint" style="margin:-12px 0 20px">New members by community: ' + perCommunity.map(function (c) { return esc(c.name) + " " + c.n; }).join(" \u00b7 ") + "</p>";
 
@@ -999,7 +1015,7 @@
       var best = p.groups.slice().sort(function (a, b) { return score(b) - score(a); })[0];
       return { p: p, l: t.l, c: t.c, s: t.l + 2 * t.c, best: best };
     }).filter(function (x) { return x.p.groups.length; }).sort(function (a, b) { return b.s - a.s; });
-    html += '<div class="sblock"><h2>&#127942; Your best posts</h2><p class="hint">Ranked by likes and comments, with comments counting double.</p>' +
+    html += '<div class="sblock"><h2>&#127942; Your best posts</h2><p class="hint">Ranked by the likes and comments they got in the ' + R.lbl2 + ', with comments counting double.</p>' +
       (ranked.length ? ranked.slice(0, 6).map(function (x, i) {
         return '<div class="bestpost">' + (x.p.thumb ? '<img src="' + x.p.thumb + '" alt="">' : '<span class="noimg"></span>') +
           '<div style="min-width:0"><div class="rank">#' + (i + 1) + '</div><div class="ttl2">' + esc(x.p.title || "(no title)") + "</div>" +
@@ -1015,7 +1031,7 @@
     var wd = {}; A.posts.forEach(function (p) { p.groups.forEach(function (g) { var d = (new Date(g.postedAt).getDay() + 6) % 7; var x = wd[d] || (wd[d] = { n: 0, s: 0 }); x.n++; x.s += score(g); }); });
     var days = Object.keys(wd).filter(function (d) { return wd[d].n >= 2; }).sort(function (a, b) { return wd[b].s / wd[b].n - wd[a].s / wd[a].n; });
     if (gl.length) {
-      html += '<div class="sblock"><h2>&#128205; Where your posts land best</h2><p class="hint">Average likes and comments per post in each group.' +
+      html += '<div class="sblock"><h2>&#128205; Where your posts land best</h2><p class="hint">Average likes and comments per post in each group, ' + R.lbl2 + '.' +
         (days.length >= 2 ? " Your best day to post so far: <b>" + DAYS[days[0]] + "</b>." : "") + "</p>" +
         '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Posts</th><th class="n">👍 avg</th><th class="n">💬 avg</th></tr></thead><tbody>' +
         gl.map(function (g) { return "<tr><td>" + esc(g.name) + '</td><td class="n">' + g.n + '</td><td class="n">' + g.l.toFixed(1) + '</td><td class="n">' + g.c.toFixed(1) + "</td></tr>"; }).join("") +
