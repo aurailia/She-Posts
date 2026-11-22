@@ -929,6 +929,7 @@
   /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
   var AKEY = "sp-analytics-v1", hasAssistant = false;
   var RANGES = { "24h": { ms: 86400000, label: "24 hours", lbl2: "last 24 hours", bars: 7 }, "7d": { ms: 7 * 86400000, label: "7 days", lbl2: "last 7 days", bars: 7 }, "30d": { ms: 30 * 86400000, label: "30 days", lbl2: "last 30 days", bars: 30 } };
+  function commKey(A) { var c = ""; try { c = localStorage.getItem("sp-analytics-comm") || ""; } catch (e) {} return (A.communities || []).some(function (x) { return x.slug === c; }) ? c : ""; }
   function rangeKey() { try { var r = localStorage.getItem("sp-analytics-range"); return RANGES[r] ? r : "7d"; } catch (e) { return "7d"; } }
   function loadA() { try { return JSON.parse(localStorage.getItem(AKEY) || "null"); } catch (e) { return null; } }
   function ago(t) {
@@ -949,12 +950,25 @@
       return;
     }
     var now = Date.now(), RK = rangeKey(), R = RANGES[RK], html = "";
+    var CM = A.communities || [], CK = commKey(A), CN = CK ? (CM.find(function (x) { return x.slug === CK; }) || {}).name : "";
+    if (CM.length > 1) {
+      html += '<div class="ptabs" role="group" aria-label="Community" style="margin:0 0 12px">' +
+        [{ slug: "", name: "All communities" }].concat(CM).map(function (c) { return '<button type="button" class="ptab' + (c.slug === CK ? " on" : "") + '" data-scomm="' + esc(c.slug) + '" aria-pressed="' + (c.slug === CK) + '">' + esc(c.name) + "</button>"; }).join("") + "</div>";
+    }
     html += '<div class="row" style="justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
       '<div class="ptabs" role="group" aria-label="Time range" style="margin:0">' + ["24h", "7d", "30d"].map(function (k) { return '<button type="button" class="ptab' + (k === RK ? " on" : "") + '" data-srange="' + k + '" aria-pressed="' + (k === RK) + '">' + RANGES[k].label + "</button>"; }).join("") + "</div>" +
       '<span class="row" style="gap:10px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
       (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</span></div>";
-    // Only what happened in the chosen time
+    // Only what happened in the chosen time, for the chosen community
     A = JSON.parse(JSON.stringify(A));
+    if (CK) {
+      A.posts = A.posts.filter(function (p) { return (p.comms || []).indexOf(CK) !== -1; });
+      A.warm = (A.warm || []).filter(function (p) { return (p.eng || []).indexOf(CK) !== -1; }).map(function (p) { p.inMine = p.inC ? p.inC.indexOf(CK) !== -1 : (p.inMine === false ? false : null); return p; });
+      A.waiting = (A.waiting || []).filter(function (w) { return (w.comms || []).indexOf(CK) !== -1; });
+      A.newMembers = (A.newMembers || []).filter(function (n) { return n.community === CK; });
+    }
+    var perCommunity = CM.map(function (c) { return { name: c.name, n: (A.newMembers || []).filter(function (n) { return n.community === c.slug && now - n.joinedAt < R.ms; }).length }; });
+    if (!CK) { var seenN = {}; A.newMembers = (A.newMembers || []).filter(function (n) { if (seenN[n.id]) return false; seenN[n.id] = 1; return true; }); }
     var allPosts = A.posts.map(function (p) { return { groups: p.groups.slice() }; });
     A.posts = A.posts.map(function (p) { p.groups = p.groups.filter(function (g) { return now - g.postedAt < R.ms; }); return p; }).filter(function (p) { return p.groups.length; });
     A.warm = (A.warm || []).filter(function (p) { return !p.lastAt || now - p.lastAt < R.ms; });
@@ -967,7 +981,8 @@
       '<div class="stat"><b>' + sends + "</b><span>posts sent, " + R.lbl2 + "</span></div>" +
       '<div class="stat"><b>' + likes + "</b><span>likes on them</span></div>" +
       '<div class="stat"><b>' + comms + "</b><span>comments on them</span></div>" +
-      (A.hasCommunity ? '<div class="stat"><b>' + A.newMembers.length + "</b><span>new members</span></div>" : "") + "</div>";
+      (A.hasCommunity ? '<div class="stat"><b>' + A.newMembers.length + "</b><span>new members" + (CK ? " in " + esc(CN) : "") + "</span></div>" : "") + "</div>";
+    if (!CK && CM.length > 1 && A.hasCommunity) html += '<p class="hint" style="margin:-12px 0 20px">New members by community: ' + perCommunity.map(function (c) { return esc(c.name) + " " + c.n; }).join(" \u00b7 ") + "</p>";
 
     // Comments waiting
     var W = A.waiting || [];
@@ -1024,7 +1039,7 @@
       html += '<div class="sblock"><h2>&#127793; New members</h2><p class="hint">Where else they hang out, from their Skool profile. It’s a hint about where they found you, not proof.</p>' +
         (NM.length ? NM.slice(0, 15).map(function (n) {
           var also = n.alsoIn === null || n.alsoIn === undefined ? "Checking where else they hang out…" : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) : "Not in any of your promo groups";
-          return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined ' + ago(n.joinedAt) + " · " + also + "</div></div></div>";
+          return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined' + (!CK && CM.length > 1 ? " " + esc((CM.find(function (x) { return x.slug === n.community; }) || {}).name || "") : "") + " " + ago(n.joinedAt) + " \u00b7 " + also + "</div></div></div>";
         }).join("") : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
       var posted = {}; allPosts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
       var cnt = {}; allMembers.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
@@ -1038,6 +1053,8 @@
   $("statsBody").addEventListener("click", function (e) {
     var rg = e.target.closest("[data-srange]");
     if (rg) { try { localStorage.setItem("sp-analytics-range", rg.getAttribute("data-srange")); } catch (e2) {} renderStats(); return; }
+    var cm = e.target.closest("[data-scomm]");
+    if (cm) { try { localStorage.setItem("sp-analytics-comm", cm.getAttribute("data-scomm")); } catch (e3) {} renderStats(); return; }
     var b = e.target.closest("[data-sact]"); if (!b) return;
     var act = b.getAttribute("data-sact");
     if (act === "refresh") { b.disabled = true; b.textContent = "Updating…"; window.postMessage({ source: "she-posts", type: "refresh" }, location.origin); toast("Updating your numbers. This takes a minute or two."); }
