@@ -928,6 +928,8 @@
 
   /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
   var AKEY = "sp-analytics-v1", hasAssistant = false;
+  var RANGES = { "24h": { ms: 86400000, label: "24 hours", lbl2: "last 24 hours", bars: 7 }, "7d": { ms: 7 * 86400000, label: "7 days", lbl2: "last 7 days", bars: 7 }, "30d": { ms: 30 * 86400000, label: "30 days", lbl2: "last 30 days", bars: 30 } };
+  function rangeKey() { try { var r = localStorage.getItem("sp-analytics-range"); return RANGES[r] ? r : "7d"; } catch (e) { return "7d"; } }
   function loadA() { try { return JSON.parse(localStorage.getItem(AKEY) || "null"); } catch (e) { return null; } }
   function ago(t) {
     var m = Math.round((Date.now() - t) / 60000);
@@ -946,19 +948,26 @@
         (hasAssistant ? '<div class="row"><button class="btn primary" type="button" data-sact="refresh">Update now</button></div>' : "") + "</div>";
       return;
     }
-    var now = Date.now(), M30 = 30 * 86400000, html = "";
-    html += '<div class="row" style="justify-content:space-between;margin-bottom:14px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
-      (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</div>";
+    var now = Date.now(), RK = rangeKey(), R = RANGES[RK], html = "";
+    html += '<div class="row" style="justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
+      '<div class="ptabs" role="group" aria-label="Time range" style="margin:0">' + ["24h", "7d", "30d"].map(function (k) { return '<button type="button" class="ptab' + (k === RK ? " on" : "") + '" data-srange="' + k + '" aria-pressed="' + (k === RK) + '">' + RANGES[k].label + "</button>"; }).join("") + "</div>" +
+      '<span class="row" style="gap:10px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
+      (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</span></div>";
+    // Only what happened in the chosen time
+    A = JSON.parse(JSON.stringify(A));
+    var allPosts = A.posts.map(function (p) { return { groups: p.groups.slice() }; });
+    A.posts = A.posts.map(function (p) { p.groups = p.groups.filter(function (g) { return now - g.postedAt < R.ms; }); return p; }).filter(function (p) { return p.groups.length; });
+    A.warm = (A.warm || []).filter(function (p) { return !p.lastAt || now - p.lastAt < R.ms; });
+    var allMembers = A.newMembers || [];
+    A.newMembers = allMembers.filter(function (n) { return now - n.joinedAt < R.ms; });
 
-    // Totals for the last 30 days
     var sends = 0, likes = 0, comms = 0;
-    A.posts.forEach(function (p) { p.groups.forEach(function (g) { if (now - g.postedAt < M30) { sends++; likes += g.likes; comms += g.comments; } }); });
-    var joins30 = (A.newMembers || []).filter(function (n) { return now - n.joinedAt < M30; }).length;
+    A.posts.forEach(function (p) { p.groups.forEach(function (g) { sends++; likes += g.likes; comms += g.comments; }); });
     html += '<div class="stat-row">' +
-      '<div class="stat"><b>' + sends + "</b><span>posts sent, last 30 days</span></div>" +
-      '<div class="stat"><b>' + likes + "</b><span>likes</span></div>" +
-      '<div class="stat"><b>' + comms + "</b><span>comments</span></div>" +
-      (A.hasCommunity ? '<div class="stat"><b>' + joins30 + "</b><span>new members</span></div>" : "") + "</div>";
+      '<div class="stat"><b>' + sends + "</b><span>posts sent, " + R.lbl2 + "</span></div>" +
+      '<div class="stat"><b>' + likes + "</b><span>likes on them</span></div>" +
+      '<div class="stat"><b>' + comms + "</b><span>comments on them</span></div>" +
+      (A.hasCommunity ? '<div class="stat"><b>' + A.newMembers.length + "</b><span>new members</span></div>" : "") + "</div>";
 
     // Comments waiting
     var W = A.waiting || [];
@@ -1017,16 +1026,18 @@
           var also = n.alsoIn === null || n.alsoIn === undefined ? "Checking where else they hang out…" : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) : "Not in any of your promo groups";
           return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined ' + ago(n.joinedAt) + " · " + also + "</div></div></div>";
         }).join("") : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
-      var posted = {}; A.posts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
-      var cnt = {}; NM.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
+      var posted = {}; allPosts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
+      var cnt = {}; allMembers.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
       var cols = [], max = 1;
-      for (var i = 13; i >= 0; i--) { var t = now - i * 86400000, k = dayKey(t); cols.push({ k: k, n: cnt[k] || 0, p: !!posted[k], lbl: ["S", "M", "T", "W", "T", "F", "S"][new Date(t).getDay()] }); max = Math.max(max, cnt[k] || 0); }
-      html += '<div class="sblock"><h2>&#128197; Joins by day</h2><p class="hint">The last two weeks. Gold bars are days you posted.</p><div class="panel"><div class="bars">' +
+      for (var i = R.bars - 1; i >= 0; i--) { var t = now - i * 86400000, k = dayKey(t); cols.push({ k: k, n: cnt[k] || 0, p: !!posted[k], lbl: ["S", "M", "T", "W", "T", "F", "S"][new Date(t).getDay()] }); max = Math.max(max, cnt[k] || 0); }
+      html += '<div class="sblock"><h2>&#128197; Joins by day</h2><p class="hint">The last ' + (R.bars === 30 ? "30 days" : "7 days") + '. Gold bars are days you posted.</p><div class="panel"><div class="bars">' +
         cols.map(function (c) { return '<div class="b' + (c.p ? " posted" : "") + '"><em>' + (c.n || "") + '</em><i style="height:' + Math.max(4, Math.round(c.n / max * 80)) + 'px"></i><small>' + c.lbl + "</small></div>"; }).join("") + "</div></div></div>";
     }
     box.innerHTML = html;
   }
   $("statsBody").addEventListener("click", function (e) {
+    var rg = e.target.closest("[data-srange]");
+    if (rg) { try { localStorage.setItem("sp-analytics-range", rg.getAttribute("data-srange")); } catch (e2) {} renderStats(); return; }
     var b = e.target.closest("[data-sact]"); if (!b) return;
     var act = b.getAttribute("data-sact");
     if (act === "refresh") { b.disabled = true; b.textContent = "Updating…"; window.postMessage({ source: "she-posts", type: "refresh" }, location.origin); toast("Updating your numbers. This takes a minute or two."); }
