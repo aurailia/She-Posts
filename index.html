@@ -211,6 +211,9 @@
   .bars .b small { font-size: 11px; color: var(--faint); }
   .bars .b em { font-style: normal; font-size: 12px; color: var(--fg); }
   .gcat input { flex: 1 1 220px; min-width: 0; }
+  .gjoin { font-size: 14px; }
+  .gjoin a { color: var(--blush); }
+  .gnote { margin: 0; color: var(--gold); }
   .favs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
   .fav { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .fav .thumb { aspect-ratio: 1 / 1; }
@@ -463,7 +466,7 @@
         <p class="hint gsub">Promo groups you post in. Pick your level in each one, then tap the days you can post and how many posts a day.</p>
         <div class="panel">
           <div class="glist" id="gList"></div>
-          <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a promo group</button></div>
+          <div class="row"><button class="btn" type="button" id="gAdd">&#10133; Add a promo group</button><button class="btn" type="button" id="gStarter" hidden>&#10022; Add the starter groups</button></div>
         </div>
       </div>
       <div class="gsec">
@@ -553,6 +556,34 @@
       body: "This is an example post so you can see how it works.\n\nTap the title or the post to change it. Add an image underneath. Then copy it and share it in your groups.\n\nDelete it whenever you're ready to add your own.", img: "", imgPrompt: "", posted: {} }];
     SEED.groups = [{ id: "g1", name: "She Promotes\u2122", link: "https://www.skool.com/she-promotes-7924", days: [0, 1, 2, 3, 4, 5, 6], limit: 1 }];
   }
+  // Starter promo groups many members already use. Members set their own level and days.
+  var REF = "?ref=3d4bd5bdcda847a3afcfd90d513f22bf";
+  var STARTER = [
+    { k: "shepromotes", name: "She Promotes\u2122", slug: "she-promotes", cat: "\ud83d\udce3 Promote", own: true },
+    { k: "promotewithconfidence", name: "Promote With Confidence\u2122", slug: "promotewithconfidence", cat: "\ud83d\ude80 Premium & VIP Promo" },
+    { k: "thepromolounge", name: "The Promo Lounge", slug: "thepromolounge", cat: "\ud83d\udc8e Premium/VIP Promo" },
+    { k: "promocollective", name: "PROMO Collective", slug: "promo-collective-6905", cat: "\ud83c\udfd8\ufe0f Skool Communities" },
+    { k: "becomeseenhub", name: "BECOME SEEN HUB\u2122", slug: "become-seen-hub-8620", cat: "\ud83d\udce3 Promote" },
+    { k: "thequietceoclub", name: "The Quiet CEO Club", slug: "the-quiet-ceo-club-8351", cat: "VIP Business Showcase" },
+    { k: "theskoolclassifieds", name: "the skool CLASSIFIEDS", slug: "classifieds", cat: "Communities" },
+    { k: "promotetoday", name: "Promote Today", slug: "promote-today-1278", cat: "\ud83d\udc65 Communities & Groups" },
+    { k: "digitalbossskoolhub", name: "Digital Boss Skool Hub", slug: "communityhub", cat: "\ud83d\udd25 Share Your Community \ud83d\udd25" },
+    { k: "thesellerscircle", name: "The Seller's Circle", slug: "the-sellers-circle-1954", cat: "Skool Promos" },
+    { k: "thevisibilityvault", name: "The Visibility Vault", slug: "the-visibility-vault-1934", cat: "\ud83c\udf93 Skool Community Showcase" }
+  ];
+  function starterGroup(x) {
+    return { id: "st-" + x.k, name: x.name, link: "https://www.skool.com/" + x.slug, category: x.cat, days: [], starter: true,
+      join: "https://www.skool.com/" + x.slug + "/about" + (x.own || x.noRef ? "" : REF) };
+  }
+  function gKey(g) { return String(g.name || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  function gSlug(g) { try { return new URL(g.link).pathname.split("/")[1].toLowerCase().replace(/-\d+$/, ""); } catch (e) { return ""; } }
+  function missingStarters() {
+    return STARTER.filter(function (x) {
+      var slug = x.slug.replace(/-\d+$/, "");
+      return !S.groups.some(function (g) { return gKey(g) === x.k || gKey(g) === gKey({ name: x.name }) || (gSlug(g) && gSlug(g) === slug); });
+    });
+  }
+  if (MEMBER) SEED.groups = STARTER.map(starterGroup);
   var S;
   function load() {
     try { var raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); } } catch (e) {}
@@ -1628,18 +1659,21 @@
         '<button class="btn small danger" type="button" data-gdel>Remove</button></div>' +
         (g.mine ? "" :
         '<div class="gdays" role="group" aria-label="My level in this group"><span class="gdl">My level</span>' +
-        [["free", "Free"], ["premium", "Premium"], ["vip", "VIP"]].map(function (o) { var on = (g.level || "free") === o[0]; return '<button type="button" class="dchip' + (on ? " on" : "") + '" data-glevel="' + o[0] + '" aria-pressed="' + on + '">' + o[1] + "</button>"; }).join("") +
+        [["free", "Free"], ["premium", "Premium"], ["vip", "VIP"]].map(function (o) { var on = (g.level || (g.starter ? "" : "free")) === o[0]; return '<button type="button" class="dchip' + (on ? " on" : "") + '" data-glevel="' + o[0] + '" aria-pressed="' + on + '">' + o[1] + "</button>"; }).join("") +
         "</div>" +
         '<div class="gdays" role="group" aria-label="Days you can promote here"><span class="gdl">Promo days</span>' +
         DAYS.map(function (d, i) { return '<button type="button" class="dchip' + (days.indexOf(i) !== -1 ? " on" : "") + '" data-gday="' + i + '" aria-pressed="' + (days.indexOf(i) !== -1) + '">' + d.slice(0, 3) + "</button>"; }).join("") +
         "</div>" +
         '<div class="gdays" role="group" aria-label="Posts a day"><span class="gdl">Posts a day</span>' +
-        [[1, "1"], [2, "2"], [0, "Unlimited"]].map(function (o) { return '<button type="button" class="dchip' + (gLimit(g) === o[0] ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + (gLimit(g) === o[0]) + '">' + o[1] + "</button>"; }).join("") +
+        [[1, "1"], [2, "2"], [3, "3"], [0, "Unlimited"]].map(function (o) { var lon = (g.limit !== undefined || !g.starter) && gLimit(g) === o[0]; return '<button type="button" class="dchip' + (lon ? " on" : "") + '" data-glim="' + o[0] + '" aria-pressed="' + lon + '">' + o[1] + "</button>"; }).join("") +
         "</div>") +
+        (g.join ? '<div class="gjoin"><a href="' + esc(g.join) + '" target="_blank" rel="noopener">Not a member yet? Join here &#8599;</a></div>' : "") +
+        (g.starter && !g.mine && !gDays(g).length ? '<p class="hint gnote">Set your level, promo days and posts a day for this group. Check the group\u2019s rules if you\u2019re not sure. It won\u2019t show on your days until you do.</p>' : "") +
         '<div class="gdays gcat"><span class="gdl">Category</span><input type="text" aria-label="Category to post in" data-f="category" value="' + esc(g.category || "") + '" placeholder="Where you post here, like \ud83d\udce3 Promote"></div>' +
         "</div>";
     }
     var pg = promoGroups(), mg = mineGroups();
+    var miss = missingStarters().length; $("gStarter").hidden = !miss; $("gStarter").innerHTML = "&#10022; Add the starter groups (" + miss + ")";
     $("gList").innerHTML = pg.length ? pg.map(card).join("") : '<p class="hint">No promo groups yet. Add the groups where you share your offers.</p>';
     $("cList").innerHTML = mg.length ? mg.map(card).join("") : '<p class="hint">None yet.</p>';
   }
@@ -1739,6 +1773,13 @@
   $("oAdd").addEventListener("click", function () {
     S.offers.push({ id: "o" + uid(), name: "", link: "" }); save(); renderOffers();
     var ins = $("oList").querySelectorAll('[data-of="name"]'); ins[ins.length - 1].focus();
+  });
+  $("gStarter").addEventListener("click", function () {
+    var add = missingStarters();
+    if (!add.length) { toast("You already have all the starter groups \u2726"); renderGroups(); return; }
+    add.forEach(function (x) { S.groups.push(starterGroup(x)); });
+    save(); renderGroups();
+    toast("Added " + add.length + (add.length === 1 ? " group" : " groups") + ". Set your level and days for each one \u2726");
   });
   $("gAdd").addEventListener("click", function () {
     S.groups.push({ id: uid(), name: "", link: "", days: [0, 1, 2, 3, 4, 5, 6], limit: 1 }); save(); renderGroups();
