@@ -298,7 +298,15 @@
   .label, .gdl { color: #f9e3b0; }
   .refbtn { border-color: var(--gold); color: var(--gold-bright); }
 
+  .sfoot { margin: 48px 0 24px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; font-size: 14.5px; color: var(--muted); text-align: center; }
+  .sfoot a { color: var(--gold-bright); text-decoration: none; }
+  .sfoot a:hover { text-decoration: underline; }
+  .sfoot .sep { color: var(--faint); }
   /* Analytics, easier to read */
+  .updating { display: inline-flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 600; color: var(--gold-bright); padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(242,210,143,.45); background: rgba(242,210,143,.1); }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid rgba(242,210,143,.3); border-top-color: var(--gold-bright); animation: spspin .8s linear infinite; flex: none; }
+  @keyframes spspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
   .sgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
   .sgrid .srow { margin: 0; }
   #vStats .hint { font-size: 16px; }
@@ -577,6 +585,13 @@
     </div>
     <p class="hint" style="margin-top:18px">Everything saves on this device. To use it on another phone or computer, tap Save to a file on the My week page.</p>
   </section>
+  <footer class="sfoot">
+    <span>She Posts&trade; by Aurailia Arnold</span>
+    <span class="sep">&middot;</span>
+    <span>Powered by <a href="https://www.skool.com/she-promotes" target="_blank" rel="noopener">She Promotes&trade;</a></span>
+    <span class="sep">&middot;</span>
+    <a href="privacy.html" target="_blank" rel="noopener">Privacy &amp; terms</a>
+  </footer>
 </div>
 <div class="toast" id="toast" hidden role="status"></div>
 
@@ -1047,7 +1062,7 @@
 
 
   /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
-  var AKEY = "sp-analytics-v1", hasAssistant = false, CONSENT = null, offAsk = false, SHOWREF = false;
+  var AKEY = "sp-analytics-v1", hasAssistant = false, CONSENT = null, offAsk = false, SHOWREF = false, UPDATING = 0;
   function money(c) { var d = (Number(c) || 0) / 100; return "$" + (d % 1 ? d.toFixed(2) : String(d)); }
   function consentCard() {
     return '<div class="panel consent"><h2 style="margin-top:0">&#128200; Turn on your analytics</h2>' +
@@ -1081,7 +1096,7 @@
     if (A && A.off) A = null;
     if (!A) {
       box.innerHTML = '<div class="panel"><p style="margin:0">' + (hasAssistant ? "Post with your Assistant and your numbers show up here within a few hours. Want them now? Tap Update now." : "Install She Posts Assistant in Chrome and post with it. Your numbers show up here on their own.") + "</p>" +
-        (hasAssistant ? '<div class="row"><button class="btn primary" type="button" data-sact="refresh">Update now</button></div>' : "") + "</div>";
+        (hasAssistant ? (UPDATING ? '<p class="updating" style="margin-top:12px"><i class="spin"></i>Updating your numbers now. This can take a few minutes.</p>' : '<div class="row"><button class="btn primary" type="button" data-sact="refresh">Update now</button></div>') : "") + "</div>";
       return;
     }
     var now = Date.now(), RK = rangeKey(), R = RANGES[RK], html = "";
@@ -1092,8 +1107,9 @@
     }
     html += '<div class="row" style="justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
       '<div class="ptabs" role="group" aria-label="Time range" style="margin:0">' + ["24h", "7d", "30d"].map(function (k) { return '<button type="button" class="ptab' + (k === RK ? " on" : "") + '" data-srange="' + k + '" aria-pressed="' + (k === RK) + '">' + RANGES[k].label + "</button>"; }).join("") + "</div>" +
-      '<span class="row" style="gap:10px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
-      (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</span></div>";
+      '<span class="row" style="gap:10px">' + (UPDATING
+        ? '<span class="updating"><i class="spin"></i>Updating your numbers now. This can take a few minutes.</span>'
+        : '<span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" + (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "")) + "</span></div>";
     if (A.referrals) html += '<div class="row" style="margin:-4px 0 16px"><button class="btn small refbtn" type="button" data-sact="showRefs">&#128176; Your referral earnings' + (A.referrals.payout ? " \u00b7 " + money(A.referrals.payout.lifetime) : "") + "</button></div>";
     // Only what happened in the chosen time, for the chosen community
     A = JSON.parse(JSON.stringify(A));
@@ -1310,7 +1326,12 @@
     if (act === "offNo") { offAsk = false; renderStats(); return; }
     if (act === "offYes") { offAsk = false; try { localStorage.removeItem(AKEY); } catch (e4) {} sendConsent(false, false); toast("Analytics is off and cleared."); return; }
     if (act === "where") { var wid = b.getAttribute("data-id"); openWhere[wid] = !openWhere[wid]; renderStats(); return; }
-    if (act === "refresh") { b.disabled = true; b.textContent = "Updating…"; window.postMessage({ source: "she-posts", type: "refresh" }, location.origin); toast("Updating your numbers. This takes a minute or two."); }
+    if (act === "refresh") {
+      UPDATING = Date.now(); renderStats();
+      window.postMessage({ source: "she-posts", type: "refresh" }, location.origin);
+      // If the Assistant never answers, don't leave it spinning forever
+      clearTimeout(window.__spUpd); window.__spUpd = setTimeout(function () { if (UPDATING) { UPDATING = 0; renderStats(); toast("Still working in the background. Your numbers will fill in on their own."); } }, 8 * 60000);
+    }
     if (act === "done") {
       var id = b.getAttribute("data-id"), A = loadA();
       if (A) { A.waiting = (A.waiting || []).filter(function (w) { return w.id !== id; }); try { localStorage.setItem(AKEY, JSON.stringify(A)); } catch (e2) {} }
@@ -1358,7 +1379,7 @@
       if (added || updated) { save(); if (!$("vGroups").hidden) renderGroups(); toast("Your Assistant " + (added ? "added " + added + (added === 1 ? " group" : " groups") : "updated " + updated + (updated === 1 ? " group" : " groups")) + " \u2726"); }
       return;
     }
-    if (e.data.type === "refreshed") { toast(e.data.ok ? "Your numbers are up to date ✦" : (e.data.why || "That didn’t work. Try again in a bit.")); if (!$("vStats").hidden) renderStats(); return; }
+    if (e.data.type === "refreshed") { UPDATING = 0; clearTimeout(window.__spUpd); toast(e.data.ok ? "Your numbers are up to date ✦" : (e.data.why || "That didn’t work. Try again in a bit.")); if (!$("vStats").hidden) renderStats(); return; }
     if (e.data.type === "got") { toast("Sent to your Assistant \u2726 " + e.data.count + (e.data.count === 1 ? " post" : " posts")); return; }
     if (e.data.type === "marks" && Array.isArray(e.data.marks)) {
       var changed = 0;
