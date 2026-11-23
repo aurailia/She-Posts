@@ -188,7 +188,7 @@
   .sblock > .hint { margin: 0 0 12px; }
   .srow { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin-bottom: 10px; min-width: 0; }
   .srow .av2 { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; background: linear-gradient(135deg, var(--gold), var(--blush)); }
-  .srow .grow { flex: 1; min-width: 0; }
+  .srow .grow { flex: 1; min-width: 0; display: block; }
   .srow .nm { font-weight: 700; overflow-wrap: anywhere; }
   .srow .sub { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
   .srow .q { font-size: 15px; color: var(--fg); margin-top: 4px; overflow-wrap: anywhere; }
@@ -296,6 +296,61 @@
   }
   /* Labels like My level and Promo days: lighter gold */
   .label, .gdl { color: #f9e3b0; }
+  .refbtn { border-color: var(--gold); color: var(--gold-bright); }
+
+  /* Analytics, easier to read */
+  .sgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+  .sgrid .srow { margin: 0; }
+  #vStats .hint { font-size: 16px; }
+  .srow .nm { font-size: 17px; }
+  .srow .sub { font-size: 15.5px; color: var(--muted); }
+  .srow .q { font-size: 16px; }
+  .stat span { font-size: 15.5px; color: var(--muted); }
+  .stat b { font-size: 36px; }
+  .gtable { font-size: 16.5px; }
+  .gtable th { font-size: 13.5px; }
+  .gtable th.n, .gtable td.n { text-align: center; }
+  .gtable td.n { font-variant-numeric: tabular-nums; }
+
+  .wcard { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 16px 18px; margin-bottom: 12px; }
+  .whead { display: flex; align-items: center; gap: 12px; }
+  .whead .av2 { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex: none; background: linear-gradient(135deg, var(--gold), var(--blush)); }
+  .whead .nm { flex: 1; min-width: 0; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+  .wchips, .wgroups, .rchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .wchip { font-size: 15px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: rgba(242,210,143,.14); border: 1px solid rgba(242,210,143,.4); color: var(--gold-bright); }
+  .gchip { font-size: 15px; padding: 6px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--fg); }
+  .wlbl { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #f9e3b0; margin-right: 2px; }
+  .wsee { margin-top: 14px; }
+  .wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 14px; }
+  .wpost { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); text-decoration: none; min-width: 0; }
+  a.wpost:hover { border-color: var(--gold); }
+  .wpost b { color: var(--gold-bright); font-size: 15.5px; }
+  .wpost .wt { font-size: 15px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .wpost .wwhat { display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: var(--muted); margin-top: auto; }
+  .wpost .wgo { margin-left: auto; color: var(--blush); font-weight: 600; }
+
+  .rmore summary { font-size: 17px; font-weight: 600; padding: 6px 0; }
+  .rrate { margin-top: 14px; }
+  .rpct { font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #f9e3b0; }
+  .rrate .rchips { margin-top: 8px; }
+
+  .chart { padding: 18px 20px 14px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15px; color: var(--muted); margin-bottom: 10px; }
+  .legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 7px; vertical-align: -1px; }
+  .dot.gold, .bars .b.posted i { background: linear-gradient(180deg, #fae5b8, #e8c47a); }
+  .dot.lav, .bars .b i { background: linear-gradient(180deg, #c9a2e6, #8f64ad); }
+  .bars { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding: 0; border-bottom: 1px solid var(--line-strong); }
+  .bars .b { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+  .bars .b i { width: 100%; max-width: 56px; border-radius: 10px 10px 3px 3px; }
+  .bars .b em { font-style: normal; font-size: 17px; font-weight: 700; color: var(--fg); }
+  .bars .b.zero em { color: var(--faint); font-weight: 500; }
+  .bars .b.zero i { opacity: .45; }
+  .blabels { display: flex; gap: 10px; margin-top: 8px; }
+  .blabels > div { flex: 1; min-width: 0; text-align: center; }
+  .blabels b { display: block; font-size: 15px; color: var(--fg); }
+  .blabels small { display: block; font-size: 13px; color: var(--muted); }
+  .bars.many { gap: 4px; } .blabels.many { gap: 4px; }
+  .bars.many .b em { font-size: 12px; } .blabels.many b { font-size: 11px; } .blabels.many small { display: none; }
 </style>
 </head>
 <body>
@@ -992,7 +1047,7 @@
 
 
   /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
-  var AKEY = "sp-analytics-v1", hasAssistant = false, CONSENT = null, offAsk = false;
+  var AKEY = "sp-analytics-v1", hasAssistant = false, CONSENT = null, offAsk = false, SHOWREF = false;
   function money(c) { var d = (Number(c) || 0) / 100; return "$" + (d % 1 ? d.toFixed(2) : String(d)); }
   function consentCard() {
     return '<div class="panel consent"><h2 style="margin-top:0">&#128200; Turn on your analytics</h2>' +
@@ -1039,6 +1094,7 @@
       '<div class="ptabs" role="group" aria-label="Time range" style="margin:0">' + ["24h", "7d", "30d"].map(function (k) { return '<button type="button" class="ptab' + (k === RK ? " on" : "") + '" data-srange="' + k + '" aria-pressed="' + (k === RK) + '">' + RANGES[k].label + "</button>"; }).join("") + "</div>" +
       '<span class="row" style="gap:10px"><span class="hint" style="margin:0">Updated ' + ago(A.at) + "</span>" +
       (hasAssistant ? '<button class="btn small" type="button" data-sact="refresh">Update now</button>' : "") + "</span></div>";
+    if (A.referrals) html += '<div class="row" style="margin:-4px 0 16px"><button class="btn small refbtn" type="button" data-sact="showRefs">&#128176; Your referral earnings' + (A.referrals.payout ? " \u00b7 " + money(A.referrals.payout.lifetime) : "") + "</button></div>";
     // Only what happened in the chosen time, for the chosen community
     A = JSON.parse(JSON.stringify(A));
     if (CK) {
@@ -1133,14 +1189,19 @@
           var pill = p.inMine === true ? '<span class="pill in">In your community</span>' : p.inMine === false ? '<span class="pill warm">Not in yet</span>' : "";
           var open = openWhere[p.id], W2 = p.where || [];
           var counts = "Liked " + p.likes + " of your posts \u00b7 commented on " + p.comments;
-          return '<div class="srow wrow">' + avatar(p.pic) + '<div class="grow"><div class="nm">' + prof(p) + '</div><div class="sub">' + counts + (p.groups.length ? " \u00b7 in " + esc(p.groups.slice(0, 3).join(", ")) : "") + "</div>" +
-            (W2.length ? '<button class="linkbtn2" type="button" data-sact="where" data-id="' + esc(p.id) + '">' + (open ? "Hide" : "See where") + "</button>" : "") +
-            (open ? '<div class="wlist">' + W2.map(function (w) {
-              var what = (w.l ? "\ud83d\udc4d liked" : "") + (w.l && w.c ? " + " : "") + (w.c ? "\ud83d\udcac commented" : "");
-              var inner = "<b>" + esc(w.g) + "</b> \u00b7 " + esc((w.t || "").slice(0, 70)) + " \u00b7 " + what;
-              return w.url ? '<a href="' + esc(w.url) + '" target="_blank" rel="noopener">' + inner + " &#8599;</a>" : "<span>" + inner + "</span>";
+          var chips = '<span class="wchip">\ud83d\udc4d Liked ' + p.likes + (p.likes === 1 ? " post" : " posts") + "</span>" +
+            (p.comments ? '<span class="wchip">\ud83d\udcac Commented on ' + p.comments + "</span>" : "");
+          var gchips = (p.groups || []).map(function (g) { return '<span class="gchip">' + esc(g) + "</span>"; }).join("");
+          return '<div class="wcard"><div class="whead">' + avatar(p.pic) + '<div class="nm">' + prof(p) + "</div>" + pill + "</div>" +
+            '<div class="wchips">' + chips + "</div>" +
+            (gchips ? '<div class="wgroups"><span class="wlbl">In</span>' + gchips + "</div>" : "") +
+            (W2.length ? '<button class="btn small wsee" type="button" data-sact="where" data-id="' + esc(p.id) + '">' + (open ? "Hide the posts" : "See the " + W2.length + (W2.length === 1 ? " post" : " posts")) + "</button>" : "") +
+            (open ? '<div class="wgrid">' + W2.map(function (w) {
+              var what = (w.l ? '<span>\ud83d\udc4d Liked</span>' : "") + (w.c ? '<span>\ud83d\udcac Commented</span>' : "");
+              var inner = '<b>' + esc(w.g) + '</b><span class="wt">' + esc(w.t || "") + '</span><span class="wwhat">' + what + (w.url ? '<span class="wgo">Open \u2197</span>' : "") + "</span>";
+              return w.url ? '<a class="wpost" href="' + esc(w.url) + '" target="_blank" rel="noopener">' + inner + "</a>" : '<div class="wpost">' + inner + "</div>";
             }).join("") + "</div>" : "") +
-            "</div>" + pill + "</div>";
+            "</div>";
         }).join("") + "</div>";
     }
 
@@ -1148,20 +1209,22 @@
     if (A.hasCommunity) {
       var NM = A.newMembers || [];
       html += '<div class="sblock"><h2>&#127793; New members</h2><p class="hint">Where else they hang out, from their Skool profile. It’s a hint about where they found you, not proof.</p>' +
-        (NM.length ? NM.slice(0, 15).map(function (n) {
+        (NM.length ? '<div class="sgrid">' + NM.slice(0, 16).map(function (n) {
           var also = n.alsoIn === null || n.alsoIn === undefined ? "Checking where else they hang out…" : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) : "Not in any of your promo groups";
           return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined' + (!CK && CM.length > 1 ? " " + esc((CM.find(function (x) { return x.slug === n.community; }) || {}).name || "") : "") + " " + ago(n.joinedAt) + " \u00b7 " + also + "</div></div></div>";
-        }).join("") : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
+        }).join("") + "</div>" : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
       var posted = {}; allPosts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
       var cnt = {}; allMembers.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
       var cols = [], max = 1;
-      for (var i = R.bars - 1; i >= 0; i--) { var t = now - i * 86400000, k = dayKey(t); cols.push({ k: k, n: cnt[k] || 0, p: !!posted[k], lbl: ["S", "M", "T", "W", "T", "F", "S"][new Date(t).getDay()] }); max = Math.max(max, cnt[k] || 0); }
-      html += '<div class="sblock"><h2>&#128197; Joins by day</h2><p class="hint">The last ' + (R.bars === 30 ? "30 days" : "7 days") + '. Gold bars are days you posted.</p><div class="panel"><div class="bars">' +
-        cols.map(function (c) { return '<div class="b' + (c.p ? " posted" : "") + '"><em>' + (c.n || "") + '</em><i style="height:' + Math.max(4, Math.round(c.n / max * 80)) + 'px"></i><small>' + c.lbl + "</small></div>"; }).join("") + "</div></div></div>";
+      var DN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      for (var i = R.bars - 1; i >= 0; i--) { var t = now - i * 86400000, k = dayKey(t), dt = new Date(t); cols.push({ k: k, n: cnt[k] || 0, p: !!posted[k], lbl: DN[dt.getDay()], dt: dt.toLocaleDateString([], { month: "short", day: "numeric" }) }); max = Math.max(max, cnt[k] || 0); }
+      html += '<div class="sblock"><h2>&#128197; Joins by day</h2><p class="hint">The last ' + (R.bars === 30 ? "30 days" : "7 days") + '. </p><div class="panel chart"><div class="legend"><span><i class="dot gold"></i>Days you posted</span><span><i class="dot lav"></i>Days you didn\u2019t</span></div><div class="bars' + (cols.length > 10 ? " many" : "") + '">' +
+        cols.map(function (c) { return '<div class="b' + (c.p ? " posted" : "") + (c.n ? "" : " zero") + '"><em>' + c.n + '</em><i style="height:' + (c.n ? Math.max(10, Math.round(c.n / max * 130)) : 4) + 'px"></i></div>'; }).join("") + '</div><div class="blabels' + (cols.length > 10 ? " many" : "") + '">' +
+        cols.map(function (c) { return "<div><b>" + c.lbl + "</b><small>" + c.dt + "</small></div>"; }).join("") + "</div></div></div>";
     }
-    // Referral earnings
-    var RF = A.referrals;
-    if (RF && RF.pending) html += '<div class="sblock"><h2>&#128176; Your referral earnings</h2><div class="panel"><p style="margin:0">Your referral earnings show up here after the next update. It takes a few minutes.</p></div></div>';
+    // Referral earnings, shown on their own when she taps the button
+    var RF = A.referrals, rh = "";
+    if (RF && RF.pending) rh += '<div class="sblock"><h2>&#128176; Your referral earnings</h2><div class="panel"><p style="margin:0">Your referral earnings show up here after the next update. It takes a few minutes.</p></div></div>';
     else if (RF && RF.payout) {
       var raw = loadA() || {}, postCount = {};
       (raw.posts || []).forEach(function (p) { (p.groups || []).forEach(function (g) {
@@ -1172,37 +1235,44 @@
       var withRefs = (RF.groups || []).filter(function (g) { return (g.refs || []).length; }).sort(function (a, b) { return b.total - a.total || b.refs.length - a.refs.length; });
       var noRefs = (RF.groups || []).filter(function (g) { return !(g.refs || []).length; });
       var hostTotal = (RF.hosting || []).reduce(function (a, h) { return a + h.total; }, 0);
-      html += '<div class="sblock"><h2>&#128176; Your referral earnings</h2><p class="hint">From your Skool Affiliates page. Updated ' + ago(RF.at) + "." + (RF.partial ? " Skool asked us to slow down, so a few groups will fill in on the next update." : "") + "</p>" +
+      rh += '<div class="sblock"><h2>&#128176; Your referral earnings</h2><p class="hint">From your Skool Affiliates page. Updated ' + ago(RF.at) + "." + (RF.partial ? " Skool asked us to slow down, so a few groups will fill in on the next update." : "") + "</p>" +
         '<div class="stat-row">' +
         '<div class="stat"><b>' + money(RF.payout.lifetime) + '</b><span>earned all time</span></div>' +
         '<div class="stat"><b>' + money(RF.payout.last30) + '</b><span>earned, last 30 days</span></div>' +
         '<div class="stat"><b>' + money(RF.payout.payable) + '</b><span>ready to pay out</span></div>' +
         '<div class="stat"><b>' + money(RF.payout.pending) + '</b><span>on the way</span></div></div>';
       if (withRefs.length) {
-        html += '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Pays</th><th class="n">Referrals</th><th class="n">Earned</th><th class="n">Your posts</th></tr></thead><tbody>' +
+        rh += '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Pays</th><th class="n">Referrals</th><th class="n">Earned</th><th class="n">Your posts</th></tr></thead><tbody>' +
           withRefs.map(function (g) {
             var active = g.refs.filter(function (r) { return !r.cancelled; }).length;
             var pc = postCount["s:" + g.slug] || postCount["n:" + String(g.name || "").toLowerCase()] || 0;
             return "<tr><td>" + esc(g.name) + '</td><td class="n">' + g.rate + '%</td><td class="n">' + active + (active < g.refs.length ? ' <span class="hint" style="margin:0">(+' + (g.refs.length - active) + " left)</span>" : "") + '</td><td class="n">' + money(g.total) + '</td><td class="n">' + pc + "</td></tr>";
           }).join("") + "</tbody></table></div>";
-      } else html += '<div class="panel"><p style="margin:0">No one has joined a group through your link yet. Your link for each group is on your Skool Affiliates page.</p></div>';
+      } else rh += '<div class="panel"><p style="margin:0">No one has joined a group through your link yet. Your link for each group is on your Skool Affiliates page.</p></div>';
       if ((RF.hosting || []).length) {
-        html += '<h3 class="rsub">Skool communities started through your link</h3><p class="hint">' + money(hostTotal) + " earned so far.</p>" +
-          RF.hosting.map(function (h) {
+        rh += '<h3 class="rsub">Skool communities started through your link</h3><p class="hint">' + money(hostTotal) + " earned so far.</p>" +
+          '<div class="sgrid">' + RF.hosting.map(function (h) {
             return '<div class="srow">' + avatar(h.pic) + '<div class="grow"><div class="nm">' + prof(h) + '</div><div class="sub">' + esc(h.community) + " \u00b7 " + esc(h.status || "") + " \u00b7 " + money(h.total) + " earned</div></div></div>";
-          }).join("");
+          }).join("") + "</div>";
       }
       var people = [];
       withRefs.forEach(function (g) { g.refs.forEach(function (r) { people.push({ r: r, g: g.name }); }); });
       if (people.length) {
-        html += '<h3 class="rsub">Who joined through your link</h3>' +
-          people.sort(function (a, b) { return b.r.total - a.r.total; }).slice(0, 30).map(function (x) {
+        rh += '<h3 class="rsub">Who joined through your link</h3>' +
+          '<div class="sgrid">' + people.sort(function (a, b) { return b.r.total - a.r.total; }).slice(0, 30).map(function (x) {
             return '<div class="srow">' + avatar(x.r.pic) + '<div class="grow"><div class="nm">' + prof(x.r) + '</div><div class="sub">' + esc(x.g) + " \u00b7 " + esc(x.r.trial ? "Free trial" : (x.r.status || "")) + " \u00b7 " + money(x.r.total) + " earned</div></div></div>";
-          }).join("");
+          }).join("") + "</div>";
       }
-      if (noRefs.length) html += '<details class="rmore"><summary>' + noRefs.length + " more groups you\u2019re in have an affiliate program</summary><p>" +
-        noRefs.sort(function (a, b) { return b.rate - a.rate; }).map(function (g) { return esc(g.name) + " (" + g.rate + "%)"; }).join(" \u00b7 ") + "</p></details>";
-      html += "</div>";
+      if (noRefs.length) {
+        var byRate = {}; noRefs.forEach(function (g) { (byRate[g.rate] = byRate[g.rate] || []).push(g); });
+        rh += '<details class="rmore"><summary>' + noRefs.length + " more groups you\u2019re in have an affiliate program</summary>" +
+          '<p class="hint" style="margin:8px 0 4px">No one has joined these through your link yet. Your link for each is on your Skool Affiliates page.</p>' +
+          Object.keys(byRate).sort(function (a, b) { return b - a; }).map(function (r) {
+            return '<div class="rrate"><div class="rpct">Pays ' + r + "%</div><div class=\"rchips\">" +
+              byRate[r].sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); }).map(function (g) { return '<span class="gchip">' + esc(String(g.name).trim()) + "</span>"; }).join("") + "</div></div>";
+          }).join("") + "</details>";
+      }
+      rh += "</div>";
     }
 
     // Your choices
@@ -1212,6 +1282,10 @@
         '<p class="hint" style="margin:4px 0 10px">Everything stays on your computer. Turning something off clears what it saved.</p><div class="row">' +
         (offAsk ? '<button class="btn danger" type="button" data-sact="offYes">Yes, turn it off and clear it</button><button class="btn" type="button" data-sact="offNo">Keep it on</button>'
           : '<button class="btn" type="button" data-sact="offAsk">Turn off analytics</button>') + "</div></div></div>";
+    }
+    if (SHOWREF && rh) {
+      box.innerHTML = '<div class="row" style="margin:0 0 14px"><button class="btn small" type="button" data-sact="hideRefs">\u2190 Back to my analytics</button></div>' + rh;
+      return;
     }
     box.innerHTML = html;
   }
@@ -1228,6 +1302,7 @@
     var b = e.target.closest("[data-sact]"); if (!b) return;
     var act = b.getAttribute("data-sact");
     if (act === "consentOn") { if (!$("cAgree") || !$("cAgree").checked) return; sendConsent(true, !!($("cRefs") && $("cRefs").checked)); b.disabled = true; b.textContent = "Turning it on\u2026"; return; }
+    if (act === "showRefs" || act === "hideRefs") { SHOWREF = act === "showRefs"; renderStats(); var top = $("vStats"); if (top) window.scrollTo(0, top.offsetTop - 10); return; }
     if (act === "offAsk") { offAsk = true; renderStats(); return; }
     if (act === "offNo") { offAsk = false; renderStats(); return; }
     if (act === "offYes") { offAsk = false; try { localStorage.removeItem(AKEY); } catch (e4) {} sendConsent(false, false); toast("Analytics is off and cleared."); return; }
