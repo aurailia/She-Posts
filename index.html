@@ -281,6 +281,21 @@
     .brand .sync { display: none; }
     .pbar select { max-width: 100%; }
   }
+
+  /* Easier reading: brighter text on the purple */
+  :root {
+    --fg: #ffffff; --muted: #f6edf2; --faint: #e8d9e2; --line: #6a4262; --line-strong: #8a5d80;
+    --gold: #f2d28f; --gold-bright: #fae5b8; --blush: #fad0dc; --teal: #93e8da;
+  }
+  /* Page titles: bright pink to purple */
+  main h1, section > h1 {
+    width: fit-content; max-width: 100%;
+    background: linear-gradient(90deg, #ffc2d8 0%, #f29bd4 40%, #c08cff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: #f3a6d8;
+  }
+  /* Labels like My level and Promo days: lighter gold */
+  .label, .gdl { color: #f9e3b0; }
 </style>
 </head>
 <body>
