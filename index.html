@@ -1183,9 +1183,12 @@
     // Warm people
     var warm = A.warm || [];
     if (warm.length) {
-      var sorted = warm.slice().sort(function (a, b) { return (a.inMine === false ? 0 : 1) - (b.inMine === false ? 0 : 1); });
-      html += '<div class="sblock"><h2>&#128150; Your warm people</h2><p class="hint">Everyone who liked or commented on your promos. The ones not in your community yet are at the top.</p>' +
-        sorted.slice(0, 20).map(function (p) {
+      // Top 10 for the chosen time: most comments and likes first
+      var sorted = warm.slice().sort(function (a, b) {
+        return ((b.likes || 0) + 2 * (b.comments || 0)) - ((a.likes || 0) + 2 * (a.comments || 0)) || (a.inMine === false ? 0 : 1) - (b.inMine === false ? 0 : 1);
+      });
+      html += '<div class="sblock"><h2>&#128150; Your warm people</h2><p class="hint">Your top ' + Math.min(10, sorted.length) + ", " + R.lbl2 + ". The people who liked and commented on your promos the most.</p>" +
+        sorted.slice(0, 10).map(function (p) {
           var pill = p.inMine === true ? '<span class="pill in">In your community</span>' : p.inMine === false ? '<span class="pill warm">Not in yet</span>' : "";
           var open = openWhere[p.id], W2 = p.where || [];
           var counts = "Liked " + p.likes + " of your posts \u00b7 commented on " + p.comments;
