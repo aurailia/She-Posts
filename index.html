@@ -200,6 +200,10 @@
   .bestpost .rank { font-size: 13px; font-weight: 700; color: var(--gold); letter-spacing: .06em; text-transform: uppercase; }
   .bestpost .ttl2 { font-weight: 700; overflow-wrap: anywhere; }
   .bestpost .per { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .mbars { display: flex; gap: 10px; align-items: flex-end; height: 130px; }
+  .mbar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+  .mbar .mfill { width: 100%; max-width: 56px; background: var(--gold); border-radius: 8px 8px 0 0; }
+  .mbar b { font-size: 13px; } .mbar span { font-size: 12px; opacity: .85; }
   .gtable { width: 100%; border-collapse: collapse; font-size: 15px; }
   .gtable th { text-align: left; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; padding: 8px 6px; border-bottom: 1px solid var(--line); }
   .gtable td { padding: 10px 6px; border-bottom: 1px solid var(--line); color: var(--fg); }
@@ -1063,6 +1067,28 @@
 
   /* ---------- Analytics (filled in by She Posts Assistant) ---------- */
   var AKEY = "sp-analytics-v1", hasAssistant = false, CONSENT = null, offAsk = false, SHOWREF = false, UPDATING = 0;
+  // Works out monthly referral income from payments the Assistant has seen
+  function refMonthly(RF) {
+    var pays = (RF.pays || []).slice().sort(function (a, b) { return a.t - b.t; }), byK = {}, live = {}, trial = 0, out = { monthly: 0, monthlyN: 0, next30: 0, learning: 0, trial: 0, byGroup: {}, months: [], maxMonth: 1 };
+    (RF.groups || []).forEach(function (g) { (g.refs || []).forEach(function (r) { if (r.cancelled) return; if (r.trial) { trial++; return; } live[g.id + ":" + r.id] = g.id; }); });
+    (RF.hosting || []).forEach(function (h) { if (!h.cancelled) live["h:" + h.slug] = "h"; });
+    pays.forEach(function (p) { (byK[p.k] = byK[p.k] || []).push(p); });
+    var now = Date.now(), DAY = 86400000;
+    Object.keys(live).forEach(function (k) {
+      var ps = byK[k] || [];
+      if (ps.length < 2) { out.learning++; if (ps.length === 1) out.next30 += 0; return; }
+      var gap = (ps[ps.length - 1].t - ps[ps.length - 2].t) / DAY, last = ps[ps.length - 1];
+      if (gap >= 20 && gap <= 45) { out.monthly += last.a; out.monthlyN++; out.byGroup[live[k]] = (out.byGroup[live[k]] || 0) + last.a; out.next30 += last.a; }
+      else if (gap > 300) { if (last.t + 365 * DAY - now <= 30 * DAY) out.next30 += last.a; }
+      else out.learning++;
+    });
+    out.trial = trial;
+    var bym = {};
+    pays.forEach(function (p) { var d = new Date(p.t), k = d.getFullYear() * 100 + d.getMonth(); bym[k] = (bym[k] || 0) + p.a; });
+    out.months = Object.keys(bym).sort().slice(-6).map(function (k) { var y = Math.floor(k / 100), m = k % 100; return { a: bym[k], label: new Date(y, m, 1).toLocaleDateString(undefined, { month: "short" }) }; });
+    out.maxMonth = Math.max.apply(null, out.months.map(function (m) { return m.a; }).concat([1]));
+    return out;
+  }
   function money(c) { var d = (Number(c) || 0) / 100; return "$" + (d % 1 ? d.toFixed(2) : String(d)); }
   function consentCard() {
     return '<div class="panel consent"><h2 style="margin-top:0">&#128200; Turn on your analytics</h2>' +
@@ -1260,12 +1286,24 @@
         '<div class="stat"><b>' + money(RF.payout.last30) + '</b><span>earned, last 30 days</span></div>' +
         '<div class="stat"><b>' + money(RF.payout.payable) + '</b><span>ready to pay out</span></div>' +
         '<div class="stat"><b>' + money(RF.payout.pending) + '</b><span>on the way</span></div></div>';
+      // Monthly referral income, learned from real payments over time
+      var MI = refMonthly(RF);
+      rh += '<h3 class="rsub">Your monthly referral income</h3>' +
+        '<div class="stat-row">' +
+        '<div class="stat"><b>' + money(RF.payout.last30) + '</b><span>about a month, based on your last 30 days</span></div>' +
+        '<div class="stat"><b>' + money(MI.monthly) + '</b><span>confirmed monthly, from ' + MI.monthlyN + (MI.monthlyN === 1 ? " person" : " people") + '</span></div>' +
+        '<div class="stat"><b>' + money(MI.next30) + '</b><span>expected in the next 30 days</span></div>' +
+        '<div class="stat"><b>' + MI.learning + '</b><span>still learning what they pay' + (MI.trial ? " \u00b7 " + MI.trial + " in a free trial" : "") + '</span></div></div>' +
+        (MI.months.length ? '<div class="panel" style="padding:12px 16px"><div class="mbars">' + MI.months.map(function (m) {
+          return '<div class="mbar"><div class="mfill" style="height:' + Math.max(4, Math.round(m.a / MI.maxMonth * 100)) + '%"></div><b>' + money(m.a) + '</b><span>' + esc(m.label) + "</span></div>";
+        }).join("") + "</div></div>" : "") +
+        '<p class="hint">Tracking since ' + esc(new Date(RF.trackSince || RF.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })) + '. Skool doesn\u2019t share what each person pays, so She Posts learns it as their payments come in. After about a month you\u2019ll see real monthly numbers. These are estimates: cancellations and trials that don\u2019t convert will change them.</p>';
       if (withRefs.length) {
-        rh += '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Pays</th><th class="n">Referrals</th><th class="n">Earned</th><th class="n">Your posts</th></tr></thead><tbody>' +
+        rh += '<div class="panel" style="padding:8px 14px;overflow-x:auto"><table class="gtable"><thead><tr><th>Group</th><th class="n">Pays</th><th class="n">Referrals</th><th class="n">Monthly</th><th class="n">Earned</th><th class="n">Your posts</th></tr></thead><tbody>' +
           withRefs.map(function (g) {
             var active = g.refs.filter(function (r) { return !r.cancelled; }).length;
             var pc = postCount["s:" + g.slug] || postCount["n:" + String(g.name || "").toLowerCase()] || 0;
-            return "<tr><td>" + esc(g.name) + '</td><td class="n">' + g.rate + '%</td><td class="n">' + active + (active < g.refs.length ? ' <span class="hint" style="margin:0">(+' + (g.refs.length - active) + " left)</span>" : "") + '</td><td class="n">' + money(g.total) + '</td><td class="n">' + pc + "</td></tr>";
+            return "<tr><td>" + esc(g.name) + '</td><td class="n">' + g.rate + '%</td><td class="n">' + active + (active < g.refs.length ? ' <span class="hint" style="margin:0">(+' + (g.refs.length - active) + " left)</span>" : "") + '</td><td class="n">' + (MI.byGroup[g.id] ? money(MI.byGroup[g.id]) : '<span class="hint" style="margin:0">learning</span>') + '</td><td class="n">' + money(g.total) + '</td><td class="n">' + pc + "</td></tr>";
           }).join("") + "</tbody></table></div>";
       } else rh += '<div class="panel"><p style="margin:0">No one has joined a group through your link yet. Your link for each group is on your Skool Affiliates page.</p></div>';
       if ((RF.hosting || []).length) {
