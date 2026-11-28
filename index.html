@@ -311,6 +311,40 @@
   .spin { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid rgba(242,210,143,.3); border-top-color: var(--gold-bright); animation: spspin .8s linear infinite; flex: none; }
   @keyframes spspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+  /* analytics cards */
+  .cgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1000px) { .cgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 620px) { .cgrid { grid-template-columns: 1fr; } }
+  .pcard { position: relative; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+  .pimg { aspect-ratio: 16 / 10; background: #3a1a35 center / cover no-repeat; }
+  .pimg.none { display: flex; align-items: center; justify-content: center; color: var(--muted, #bba); font-size: 14px; }
+  .prank { position: absolute; top: 10px; left: 10px; background: #e8c478; color: #2a0f26; font-weight: 800; font-size: 14px; border-radius: 99px; padding: 3px 10px; }
+  .pbody { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .pbody .ttl2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pnums { display: flex; gap: 12px; align-items: center; font-size: 17px; }
+  .pnums span { font-size: 14px; opacity: .8; }
+  .pbest { font-size: 14px; color: #e8c478; }
+  .pjoin { font-size: 14px; color: #b9e3c8; }
+  .mcard { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .mhead { display: flex; gap: 12px; align-items: center; width: 100%; }
+  .mhead .grow { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+  .mhead .nm { font-size: 17px; }
+  .cgrid { align-items: start; }
+  .mnums, .msub { font-size: 14px; opacity: .85; }
+  .tier { font-size: 13px; font-weight: 700; border-radius: 99px; padding: 3px 10px; background: rgba(255,255,255,.1); }
+  .tier.premium { background: #f2b6ce; color: #3b0f35; }
+  .tier.vip { background: #e8c478; color: #2a0f26; }
+  details.more { width: 100%; margin-top: auto; }
+  details.more summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #f2b6ce; list-style: none; padding-top: 4px; }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more summary::after { content: " \25BE"; }
+  details.more[open] summary::after { content: " \25B4"; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tags span { font-size: 13px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 9px; }
+  .wlbl2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin: 10px 0 6px; }
+  .wlist { display: flex; flex-direction: column; gap: 6px; }
+  .wlist a, .wlist div { display: flex; flex-direction: column; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; color: inherit; text-decoration: none; }
+  .wlist span { opacity: .75; font-size: 13px; }
   .sgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
   .sgrid .srow { margin: 0; }
   #vStats .hint { font-size: 16px; }
@@ -1193,20 +1227,42 @@
       var best = p.groups.slice().sort(function (a, b) { return score(b) - score(a); })[0];
       return { p: p, l: t.l, c: t.c, s: t.l + 2 * t.c, best: best };
     }).filter(function (x) { return x.p.groups.length; }).sort(function (a, b) { return b.s - a.s; });
-    html += '<div class="sblock"><h2>&#127942; Your best posts</h2><p class="hint">Ranked by the likes and comments they got in the ' + R.lbl2 + ', with comments counting double.</p>' +
-      (ranked.length ? ranked.slice(0, 6).map(function (x, i) {
-        return '<div class="bestpost">' + (x.p.thumb ? '<img src="' + x.p.thumb + '" alt="">' : '<span class="noimg"></span>') +
-          '<div style="min-width:0"><div class="rank">#' + (i + 1) + '</div><div class="ttl2">' + esc(x.p.title || "(no title)") + "</div>" +
-          '<div class="per">👍 ' + x.l + " · 💬 " + x.c + " · in " + x.p.groups.length + (x.p.groups.length === 1 ? " group" : " groups") +
-          (x.best && score(x.best) ? " · did best in " + esc(x.best.name) : "") + "</div>" +
+    var allNM = allMembers;
+    function joinedAfter(p) {
+      var c = 0, seenJ = {};
+      allNM.forEach(function (n) {
+        if (seenJ[n.id] || !n.alsoIn || !n.alsoIn.length) return;
+        if (p.groups.some(function (g) { return n.alsoIn.indexOf(g.name) !== -1 && n.joinedAt >= g.postedAt && n.joinedAt - g.postedAt < 3 * 86400000; })) { seenJ[n.id] = 1; c++; }
+      });
+      return c;
+    }
+    function whyTags(p) {
+      var t = [], words = String(p.body || "").split(/\s+/).filter(Boolean).length;
+      t.push(p.thumb ? "\ud83d\uddbc\ufe0f Image" : "No image");
+      if (/\?/.test(p.title || "")) t.push("\u2753 Question title");
+      if (words) t.push(words + " words");
+      return t;
+    }
+    html += '<div class="sblock"><h2>&#127942; Your best posts</h2><p class="hint">Ranked by the likes and comments they got in the ' + R.lbl2 + ', with comments counting double. Tap More for the details.</p>' +
+      (ranked.length ? '<div class="cgrid">' + ranked.slice(0, 9).map(function (x, i) {
+        var ja = A.hasCommunity ? joinedAfter(x.p) : 0;
+        var warmN = (A.warm || []).filter(function (w) { return (w.where || []).some(function (y) { return y.t === x.p.title; }); }).length;
+        return '<div class="pcard">' + (x.p.thumb ? '<div class="pimg" style="background-image:url(' + x.p.thumb + ')"></div>' : '<div class="pimg none">No image</div>') +
+          '<span class="prank">#' + (i + 1) + '</span><div class="pbody"><div class="ttl2">' + esc(x.p.title || "(no title)") + "</div>" +
+          '<div class="pnums"><b>\ud83d\udc4d ' + x.l + '</b><b>\ud83d\udcac ' + x.c + "</b><span>" + x.p.groups.length + (x.p.groups.length === 1 ? " group" : " groups") + "</span></div>" +
+          (x.best && score(x.best) ? '<div class="pbest">Best in ' + esc(x.best.name) + "</div>" : "") +
+          (ja ? '<div class="pjoin">\ud83c\udf31 ' + ja + (ja === 1 ? " person" : " people") + " joined you after this one</div>" : "") +
+          '<details class="more"><summary>More</summary>' +
+          '<div class="tags">' + whyTags(x.p).map(function (t) { return "<span>" + esc(t) + "</span>"; }).join("") + "</div>" +
+          (warmN ? '<p class="hint" style="margin:8px 0 0">' + warmN + (warmN === 1 ? " of your warm people" : " of your warm people") + " showed up on this one.</p>" : "") +
           '<div class="glinks">' + x.p.groups.slice().sort(function (a, b) { return score(b) - score(a); }).map(function (g) {
             var lbl = esc(g.name) + ' <span>\ud83d\udc4d ' + g.likes + " \ud83d\udcac " + g.comments + "</span>";
-            return g.url ? '<a class="glink2" href="' + esc(g.url) + '" target="_blank" rel="noopener" title="Open this post in ' + esc(g.name) + '">' + lbl + " &#8599;</a>" : '<span class="glink2">' + lbl + "</span>";
+            return g.url ? '<a class="glink2" href="' + esc(g.url) + '" target="_blank" rel="noopener">' + lbl + " &#8599;</a>" : '<span class="glink2">' + lbl + "</span>";
           }).join("") + "</div>" +
-          '<div class="row" style="margin-top:8px">' + (S.favs.some(function (f) { return f.src === x.p.id; })
+          '<div class="row" style="margin-top:10px">' + (S.favs.some(function (f) { return f.src === x.p.id; })
             ? '<span class="favon">&#9733; In Favorites</span>'
-            : '<button class="btn small" type="button" data-sact="fav" data-id="' + esc(x.p.id) + '">&#9734; Save to Favorites</button>') + "</div></div></div>";
-      }).join("") : '<div class="panel"><p style="margin:0">Your best posts show up here once you’ve posted with your Assistant.</p></div>') + "</div>";
+            : '<button class="btn small" type="button" data-sact="fav" data-id="' + esc(x.p.id) + '">&#9734; Save to reuse</button>') + "</div></details></div></div>";
+      }).join("") + "</div>" : '<div class="panel"><p style="margin:0">Your best posts show up here once you\u2019ve posted with your Assistant.</p></div>') + "</div>";
 
     // Groups
     var G = {};
@@ -1229,35 +1285,44 @@
       var sorted = warm.slice().sort(function (a, b) {
         return ((b.likes || 0) + 2 * (b.comments || 0)) - ((a.likes || 0) + 2 * (a.comments || 0)) || (a.inMine === false ? 0 : 1) - (b.inMine === false ? 0 : 1);
       });
-      html += '<div class="sblock"><h2>&#128150; Your warm people</h2><p class="hint">Your top ' + Math.min(10, sorted.length) + ", " + R.lbl2 + ". The people who liked and commented on your promos the most.</p>" +
-        sorted.slice(0, 10).map(function (p) {
+      html += '<div class="sblock"><h2>&#128150; Your warm people</h2><p class="hint">Your top ' + Math.min(9, sorted.length) + ", " + R.lbl2 + ". The people who liked and commented on your promos the most. The ones not in your community yet are worth a hello.</p>" +
+        '<div class="cgrid">' + sorted.slice(0, 9).map(function (p) {
           var pill = p.inMine === true ? '<span class="pill in">In your community</span>' : p.inMine === false ? '<span class="pill warm">Not in yet</span>' : "";
-          var open = openWhere[p.id], W2 = p.where || [];
-          var counts = "Liked " + p.likes + " of your posts \u00b7 commented on " + p.comments;
-          var chips = '<span class="wchip">\ud83d\udc4d Liked ' + p.likes + (p.likes === 1 ? " post" : " posts") + "</span>" +
-            (p.comments ? '<span class="wchip">\ud83d\udcac Commented on ' + p.comments + "</span>" : "");
+          var W2 = p.where || [];
           var gchips = (p.groups || []).map(function (g) { return '<span class="gchip">' + esc(g) + "</span>"; }).join("");
-          return '<div class="wcard"><div class="whead">' + avatar(p.pic) + '<div class="nm">' + prof(p) + "</div>" + pill + "</div>" +
-            '<div class="wchips">' + chips + "</div>" +
-            (gchips ? '<div class="wgroups"><span class="wlbl">In</span>' + gchips + "</div>" : "") +
-            (W2.length ? '<button class="btn small wsee" type="button" data-sact="where" data-id="' + esc(p.id) + '">' + (open ? "Hide the posts" : "See the " + W2.length + (W2.length === 1 ? " post" : " posts")) + "</button>" : "") +
-            (open ? '<div class="wgrid">' + W2.map(function (w) {
-              var what = (w.l ? '<span>\ud83d\udc4d Liked</span>' : "") + (w.c ? '<span>\ud83d\udcac Commented</span>' : "");
-              var inner = '<b>' + esc(w.g) + '</b><span class="wt">' + esc(w.t || "") + '</span><span class="wwhat">' + what + (w.url ? '<span class="wgo">Open \u2197</span>' : "") + "</span>";
-              return w.url ? '<a class="wpost" href="' + esc(w.url) + '" target="_blank" rel="noopener">' + inner + "</a>" : '<div class="wpost">' + inner + "</div>";
-            }).join("") + "</div>" : "") +
+          return '<div class="mcard"><div class="mhead">' + avatar(p.pic) + '<div class="grow"><div class="nm">' + prof(p) + '</div><div class="mnums">\ud83d\udc4d ' + p.likes + " \u00b7 \ud83d\udcac " + p.comments + "</div></div></div>" + pill +
+            ((gchips || W2.length) ? '<details class="more"><summary>More</summary>' +
+              (gchips ? '<div class="wlbl2">Where you see them</div><div class="wgroups">' + gchips + "</div>" : "") +
+              (W2.length ? '<div class="wlbl2">Your posts they showed up on</div><div class="wlist">' + W2.map(function (w) {
+                var what = (w.l ? "\ud83d\udc4d" : "") + (w.c ? " \ud83d\udcac" : "");
+                var inner = "<b>" + esc(w.t || "Your post") + "</b><span>" + esc(w.g) + " " + what + "</span>";
+                return w.url ? '<a href="' + esc(w.url) + '" target="_blank" rel="noopener">' + inner + "</a>" : "<div>" + inner + "</div>";
+              }).join("") + "</div>" : "") + "</details>" : "") +
             "</div>";
-        }).join("") + "</div>";
+        }).join("") + "</div></div>";
     }
 
     // New members and joins by day
     if (A.hasCommunity) {
       var NM = A.newMembers || [];
-      html += '<div class="sblock"><h2>&#127793; New members</h2><p class="hint">Where else they hang out, from their Skool profile. It’s a hint about where they found you, not proof.</p>' +
-        (NM.length ? '<div class="sgrid">' + NM.slice(0, 16).map(function (n) {
-          var also = n.alsoIn === null || n.alsoIn === undefined ? "Checking where else they hang out…" : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) : "Not in any of your promo groups";
-          return '<div class="srow">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="sub">Joined' + (!CK && CM.length > 1 ? " " + esc((CM.find(function (x) { return x.slug === n.community; }) || {}).name || "") : "") + " " + ago(n.joinedAt) + " \u00b7 " + also + "</div></div></div>";
-        }).join("") + "</div>" : '<div class="panel"><p style="margin:0">New members show up here as they join.</p></div>') + "</div>";
+      var NMF = "all"; try { NMF = localStorage.getItem("sp-nm-filter") || "all"; } catch (e) {}
+      var hasTier = NM.some(function (n) { return n.tier; });
+      var TL = { free: "Free", premium: "Premium", vip: "VIP" };
+      var tc = { free: 0, premium: 0, vip: 0 }, upN = 0;
+      NM.forEach(function (n) { if (tc[n.tier] !== undefined) tc[n.tier]++; if (n.upgradedAt && n.upgradedAt >= n.joinedAt - 86400000) upN++; });
+      var shown = hasTier && NMF !== "all" ? NM.filter(function (n) { return n.tier === NMF; }) : NM;
+      function fmtD(t) { return new Date(t).toLocaleDateString([], { month: "short", day: "numeric" }); }
+      html += '<div class="sblock"><h2>&#127793; New members</h2><p class="hint">' + NM.length + " new, " + R.lbl2 + (hasTier && upN ? " \u00b7 " + upN + " upgraded" : "") + ".</p>" +
+        (hasTier ? '<div class="ptabs" role="group" aria-label="Filter members" style="margin:0 0 12px">' + ["all", "free", "premium", "vip"].map(function (k) {
+          return '<button type="button" class="ptab' + (k === NMF ? " on" : "") + '" data-snm="' + k + '">' + (k === "all" ? "All " + NM.length : TL[k] + " " + tc[k]) + "</button>"; }).join("") + "</div>" : "") +
+        (shown.length ? '<div class="cgrid">' + shown.slice(0, 24).map(function (n) {
+          var badge = n.tier && TL[n.tier] ? '<span class="tier ' + n.tier + '">' + TL[n.tier] + (n.interval === "year" ? " yearly" : "") + "</span>" : n.tier ? '<span class="tier premium">Paid</span>' : "";
+          var up = n.upgradedAt ? '<div class="msub">Upgraded about ' + fmtD(n.upgradedAt) + "</div>" : n.gifted ? '<div class="msub">Given free access</div>' : "";
+          var also = n.alsoIn === null || n.alsoIn === undefined ? "Still checking where else they hang out." : n.alsoIn.length ? "Also in " + esc(n.alsoIn.join(", ")) + ". A hint about where they found you, not proof." : "Not in any of your promo groups.";
+          return '<div class="mcard"><div class="mhead">' + avatar(n.pic) + '<div class="grow"><div class="nm">' + prof(n) + '</div><div class="msub">Joined ' + fmtD(n.joinedAt) +
+            (!CK && CM.length > 1 ? " \u00b7 " + esc((CM.find(function (x) { return x.slug === n.community; }) || {}).name || "") : "") + "</div>" + up + "</div></div>" + badge +
+            '<details class="more"><summary>More</summary><p class="hint" style="margin:6px 0 0">' + also + "</p></details></div>";
+        }).join("") + "</div>" : '<div class="panel"><p style="margin:0">' + (NM.length ? "No one in this group yet." : "New members show up here as they join.") + "</p></div>") + "</div>";
       var posted = {}; allPosts.forEach(function (p) { p.groups.forEach(function (g) { posted[dayKey(g.postedAt)] = 1; }); });
       var cnt = {}; allMembers.forEach(function (n) { var k = dayKey(n.joinedAt); cnt[k] = (cnt[k] || 0) + 1; });
       var cols = [], max = 1;
@@ -1352,6 +1417,8 @@
     if (e.target.id === "cRefsOn") { sendConsent(true, e.target.checked); toast(e.target.checked ? "Referral earnings are on. They update once a day \u2726" : "Referral earnings are off and cleared."); }
   });
   $("statsBody").addEventListener("click", function (e) {
+    var nmf = e.target.closest("[data-snm]");
+    if (nmf) { try { localStorage.setItem("sp-nm-filter", nmf.getAttribute("data-snm")); } catch (e2) {} renderStats(); return; }
     var rg = e.target.closest("[data-srange]");
     if (rg) { try { localStorage.setItem("sp-analytics-range", rg.getAttribute("data-srange")); } catch (e2) {} renderStats(); return; }
     var cm = e.target.closest("[data-scomm]");
